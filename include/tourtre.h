@@ -201,6 +201,6 @@ ctBranch ** ct_branchMap( ctContext * ctx );
 
 	\section Download
 	
-	The latest version is v5. Download it \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v5.tar.gz">here</a>. \endhtmlonly 
+	The latest version is v6. Download it \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v6.tar.gz">here</a>. \endhtmlonly 
     It does not currently fail gracefully if you pass it bad input. It will just do something stupid like "assert(false);" I will add some nice error message facility in the future. 
 */
