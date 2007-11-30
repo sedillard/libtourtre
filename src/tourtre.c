@@ -301,6 +301,8 @@ void ct_augment( ctContext * ctx )
 
 
 
+#if 0
+/* this causes stack overflow on bigger, noisy datasets */
 void ct_queueLeaves( ctLeafQ * lq, ctComponent * c, ctComponent ** map ) {
 	map[c->birth] = c; /* the mapping will have changed in ct_augment */
 	if ( ctComponent_isLeaf(c) ) {
@@ -314,7 +316,34 @@ void ct_queueLeaves( ctLeafQ * lq, ctComponent * c, ctComponent ** map ) {
 		}
 	}
 }
+#endif
 
+void ct_queueLeaves( ctLeafQ *lq, ctComponent *c_, ctComponent **map )
+{
+  size_t stack_mem_size = 1024, stack_size=1;
+  ctComponent ** stack = (ctComponent**) malloc( stack_mem_size * sizeof(ctComponent*) );
+  stack[0] = c_;
+  while(stack_size) {
+    ctComponent *c = stack[--stack_size];  
+    map[c->birth] = c; /* the mapping will have changed in ct_augment */
+    if (ctComponent_isLeaf(c)) {
+      ctLeafQ_pushBack(lq,c);
+    } else {
+      ctComponent *pred = c->pred;
+      while (pred->nextPred) pred = pred->nextPred;
+      for (; pred != NULL; pred = pred->prevPred ) {
+        if (stack_size >= stack_mem_size-1) {
+          stack_mem_size *= 2;
+          { ctComponent **new_stack = (ctComponent**)realloc( stack, stack_mem_size*sizeof(ctComponent*) );
+            stack = new_stack;
+          }
+        }
+        stack[stack_size++] = pred;
+      }
+    }
+  }
+  free(stack);
+} 
 	
 ctArc * ct_merge( ctContext * ctx )
 {
