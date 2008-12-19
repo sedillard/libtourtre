@@ -311,22 +311,6 @@ void ct_augment( ctContext * ctx )
 
 
 
-#if 0
-/* this causes stack overflow on bigger, noisy datasets */
-void ct_queueLeaves( ctLeafQ * lq, ctComponent * c, ctComponent ** map ) {
-    map[c->birth] = c; /* the mapping will have changed in ct_augment */
-    if ( ctComponent_isLeaf(c) ) {
-        ctLeafQ_pushBack(lq,c);
-
-    } else {
-        ctComponent * pred = c->pred;
-        while( pred->nextPred ) pred = pred->nextPred;
-        for ( ; pred != NULL; pred = pred->prevPred ) {
-            ct_queueLeaves(lq,pred,map);    
-        }
-    }
-}
-#endif
 
 void ct_queueLeaves( ctLeafQ *lq, ctComponent *c_, ctComponent **map )
 {
