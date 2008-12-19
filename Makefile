@@ -1,7 +1,6 @@
 CC = gcc
 CPPFLAGS = -I./include
 CFLAGS = -ansi -pedantic -fPIC -Wall -O2
-LDFLAGS = -shared 
 AR = ar
 ARFLAGS = -q
 
@@ -18,7 +17,7 @@ libtourtre.a : src/tourtre.o src/ctArc.o src/ctBranch.o src/ctComponent.o src/ct
 	$(AR) $(ARFLAGS) libtourtre.a src/tourtre.o src/ctArc.o src/ctBranch.o src/ctComponent.o src/ctNode.o src/ctQueue.o
 	
 libtourtre.so : src/tourtre.o src/ctArc.o src/ctBranch.o src/ctComponent.o src/ctNode.o src/ctQueue.o
-	$(CC) $(LDFLAGS) -o libtourtre.so src/tourtre.o src/ctArc.o src/ctBranch.o src/ctComponent.o src/ctNode.o src/ctQueue.o
+	$(CC) -shared -o libtourtre.so src/tourtre.o src/ctArc.o src/ctBranch.o src/ctComponent.o src/ctNode.o src/ctQueue.o
 
 src/tourtre.o : src/tourtre.c include/tourtre.h src/ctMisc.h include/ctArc.h include/ctNode.h src/ctComponent.h include/ctNode.h src/ctQueue.h src/ctAlloc.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o src/tourtre.o -c src/tourtre.c
