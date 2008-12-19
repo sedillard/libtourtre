@@ -271,7 +271,7 @@ ctBranch ** ct_branchMap( ctContext * ctx );
 
     There is an API change from v8 (which is still available 
     \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v8.tar.gz">here</a>. \endhtmlonly 
-    ) A comparison callback is no longer required, the total order suffices.
+    ) A comparison callback is no longer required, the total order suffices. 
 
     It does not currently fail gracefully if you pass it bad input. It will
     just do something stupid like "assert(false);" I will add some nice error
