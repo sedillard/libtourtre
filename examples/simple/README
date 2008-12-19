@@ -1,0 +1,28 @@
+this is a simple application using libtourtre.
+
+It reads in grayscale images in 2D or 3D and spits out a text file 
+containing the contour tree, in branch-decomposition form.
+
+The input data is just plain unsigned bytes, like the files you
+find at volvis.org. The program will figure out the file size from 
+the filename (run ./simple with no arguments to find out what the 
+filename should look like.)
+
+The output looks kind of like a lisp expression. If you're familiar 
+with BNF, then the syntax is this:
+
+branch ::== '(' <extremum> <saddle> { <branch> } ')'
+
+So a tree might look like this
+
+( 5 50 ( 20 30 ) ( 100 200 ) )
+
+which means the main branch goes from 5 to 50, and has two child
+branches, 20 to 30 and 100 to 200.
+
+Look in main.cpp to see how to use libtourtre. The other files 
+(Data.cpp, Mesh.cpp) just read the data and define a tetrahedral mesh.
+
+
+
+
