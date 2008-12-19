@@ -56,6 +56,13 @@ ctBranchList ctBranchList_init()
 	return bl;
 }
 
+
+static int 
+compareSaddles(size_t a, size_t b, ctContext * ctx)
+{
+    return (*(ctx->value))(a,ctx->data) < (*(ctx->value))(b,ctx->data);
+}
+
 void ctBranchList_add(ctBranchList * self, ctBranch * c, ctContext * ctx)
 {
 	if (!self->head) { /* front of list */
@@ -64,9 +71,10 @@ void ctBranchList_add(ctBranchList * self, ctBranch * c, ctContext * ctx)
 		c->nextChild = NULL;
 	} else {
 		ctBranch * i = self->head;
-		while( (*(ctx->less))(i->saddle,c->saddle,ctx->data) && i->nextChild ) i = i->nextChild;
+		while( compareSaddles(i->saddle,c->saddle,ctx) && i->nextChild ) 
+                    i = i->nextChild;
 		
-		if ( (*(ctx->less))(i->saddle,c->saddle,ctx->data) ) { /* end of list */
+		if ( compareSaddles(i->saddle,c->saddle,ctx) ) { /* end of list */
 			c->nextChild = NULL;
 			c->prevChild = i;
 			i->nextChild = c;
@@ -80,15 +88,6 @@ void ctBranchList_add(ctBranchList * self, ctBranch * c, ctContext * ctx)
 	}
 }
 		
-
-int ctSaddleCompare(size_t a, size_t b, ctContext * ctx)
-{
-	if ( (*(ctx->value))(a,ctx->data) != (*(ctx->value))(b,ctx->data) ) {
-		return (*(ctx->value))(a,ctx->data) < (*(ctx->value))(b,ctx->data);
-	} else {
-		return a > b;
-	}
-}
 
 void ctBranchList_remove(ctBranchList * self, ctBranch * c)
 {
@@ -113,7 +112,7 @@ void ctBranchList_merge( ctBranchList * self, ctBranchList * other, ctContext * 
 		ctBranch *o = other->head;
 		ctBranch *li = 0, *lo = 0;
 		while(i && o) {
-			if ( ctSaddleCompare(o->saddle,i->saddle,ctx) ) {
+			if ( compareSaddles(o->saddle,i->saddle,ctx) ) {
 				ctBranch * next;
 				lo = o;
 				/* move marker along */

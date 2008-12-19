@@ -43,22 +43,31 @@ struct ctContext;
 
 /**	\brief List of branches.
 
-	Doubly-linked, null-terminated list of child branches. Iterate a list of children like this:
+    Doubly-linked, null-terminated list of child branches. Iterate a list of
+    children like this:
 
-	for ( ctBranch* ch = branch->children.head; ch != NULL; ch = ch->nextChild ) ...
+    \code
+    for ( ctBranch* ch = branch->children.head; ch != NULL; ch = ch->nextChild ) ...
+    \endcode
 */
 typedef struct ctBranchList
 {
-	/** Start of list. To iterate, follow ctBranch nextChild and prevChild pointers. */
-	struct ctBranch *head;
+    /** 
+     * Start of list. To iterate, follow ctBranch nextChild and prevChild
+     * pointers. 
+     **/
+    struct ctBranch *head;
 
 } ctBranchList;
 
 
 /** \brief Branch of the branch decomposition.
 
-	This is a branch of the branch decomposition. It is the only object in the branch decomposition data structure.
-    Each branch stores a list of child branches which are (according to \ref ct_priorityFunc ) of less importance than their pairent. */
+    This is a branch of the branch decomposition. It is the only object in
+    the branch decomposition data structure.  Each branch stores a list of
+    child branches which are (according to \ref ct_priorityFunc ) of less
+    importance than their pairent.
+ */
 typedef struct ctBranch
 {
 	/** Extremal vertex. Could be a minimum or a maximum critical point. */
@@ -89,7 +98,11 @@ typedef struct ctBranch
 /** Create an empty branch list */
 ctBranchList  ctBranchList_init   ();
 
-/** Add branch br to a branch list. br will be inserted in order of ascending saddles. */
+/** 
+ * Add branch br to a branch list. br will be inserted in order of ascending
+ * function value of the saddle. The order does \em not respect the total order
+ * provided \ref ct_init  
+ **/
 void  ctBranchList_add    ( ctBranchList * self, ctBranch * br, struct ctContext * ctx );
 
 /** Remove branch br from a branch list. */
@@ -98,7 +111,10 @@ void  ctBranchList_remove ( ctBranchList * self, ctBranch * br );
 /** Merge two sorted branch lists. */
 void  ctBranchList_merge  ( ctBranchList * self, ctBranchList * other, struct ctContext * ctx );
 
-/** Allocate a new branch using the allocator specified by \ref ct_branchAllocator */
+/** 
+ * Allocate a new branch using the allocator specified by \ref
+ * ct_branchAllocator 
+ **/
 ctBranch*  ctBranch_new    ( size_t extremum, size_t saddle, struct ctContext* ctx );
 
 /** Delete a branch using the deallocator specified by \ref ct_branchAllocator */

@@ -35,20 +35,34 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ctAlloc.h"
 #include "ctContext.h"
 
-/* internal functions */
-ctComponent*  ct_sweep        ( size_t start, size_t end, int inc, ctComponent ** comps, size_t * next, ctContext * ctx );
-        void  ct_augment      ( ctContext * ctx );
-      ctArc*  ct_merge        ( ctContext * ctx );
-        void  ct_checkContext ( ctContext * ctx );
+/* local functions */
+static
+ctComponent* ct_sweep ( size_t start, 
+                        size_t end, 
+                        int inc, 
+                        ctComponentType type, 
+                        ctComponent ** comps, 
+                        size_t * next, 
+                        ctContext * ctx );
+
+static
+void    
+ct_augment ( ctContext * ctx );
+
+static
+ctArc* ct_merge ( ctContext * ctx );
+
+static
+void  
+ct_checkContext ( ctContext * ctx );
 
 
 
 
-
-ctContext * ct_init( 
-    size_t  numVerts,
+ctContext* 
+ct_init
+(   size_t  numVerts,
     size_t  *totalOrder, 
-       int  (*less)( size_t a, size_t b, void* ),
     double  (*value)( size_t v, void* ),
     size_t  (*neighbors)( size_t v, size_t* nbrs, void* ),
      void*  data
@@ -73,7 +87,6 @@ ctContext * ct_init(
     /* get parameter values */
     ctx->numVerts = numVerts;
     ctx->totalOrder = totalOrder;
-    ctx->less = less;
     ctx->value = value;
     ctx->neighbors = neighbors;
     ctx->data = data;
@@ -126,9 +139,13 @@ ctArc * ct_sweepAndMerge( ctContext * ctx )
         ctArc * ret;
         
         printf("join sweep\n");
-        ctx->joinRoot  = ct_sweep( 0,ctx->numVerts,+1,    ctx->joinComps,  ctx->nextJoin, ctx  );
+        ctx->joinRoot = 
+            ct_sweep( 0,ctx->numVerts,+1,
+                CT_JOIN_COMPONENT, ctx->joinComps, ctx->nextJoin, ctx  );
         printf("split sweep\n");
-        ctx->splitRoot = ct_sweep( ctx->numVerts-1,-1,-1, ctx->splitComps, ctx->nextSplit, ctx );
+        ctx->splitRoot = 
+            ct_sweep( ctx->numVerts-1,-1,-1, 
+                CT_SPLIT_COMPONENT, ctx->splitComps, ctx->nextSplit, ctx );
         ct_augment( ctx );
         ret = ct_merge( ctx );
         
@@ -136,12 +153,13 @@ ctArc * ct_sweepAndMerge( ctContext * ctx )
     }
 }
 
-
+static
 ctComponent* 
 ct_sweep
 (   size_t start, 
     size_t end, 
     int inc, 
+    ctComponentType type,
     ctComponent** comps, 
     size_t* next, 
     ctContext* ctx )
@@ -182,7 +200,7 @@ ct_sweep
                             
                             
                             /* create new component */
-                            ctComponent * newComp = ctComponent_new(ctx); 
+                            ctComponent * newComp = ctComponent_new(type); 
                             newComp->birth = i;
                             ctComponent_addPred( newComp, iComp );
                             ctComponent_addPred( newComp, jComp );
@@ -221,7 +239,7 @@ ct_sweep
             if (numNbrComps == 0) {
     
                 /* this was a local maxima. create a new component */
-                iComp = ctComponent_new();
+                iComp = ctComponent_new(type);
                 iComp->birth = i;
                 comps[i] = iComp;
                 iComp->last = i;
@@ -249,8 +267,9 @@ ct_sweep
     }
 }
     
-    
-void ct_augment( ctContext * ctx )
+static    
+void 
+ct_augment( ctContext * ctx )
 {
     ct_checkContext(ctx);
     {
@@ -268,7 +287,7 @@ void ct_augment( ctContext * ctx )
     
             if (joinComp->birth == i && splitComp->birth != i) {
     
-                ctComponent * newComp = ctComponent_new();
+                ctComponent * newComp = ctComponent_new(CT_SPLIT_COMPONENT);
                 newComp->birth = i;
                 newComp->death = splitComp->death;
                 splitComp->death = i;
@@ -288,7 +307,7 @@ void ct_augment( ctContext * ctx )
     
             } else if ( splitComp->birth == i && joinComp->birth != i ) {
     
-                ctComponent * newComp = ctComponent_new();
+                ctComponent * newComp = ctComponent_new(CT_JOIN_COMPONENT);
                 newComp->death = i;
                 newComp->birth = joinComp->birth;
                 joinComp->birth = i;
@@ -311,8 +330,9 @@ void ct_augment( ctContext * ctx )
 
 
 
-
-void ct_queueLeaves( ctLeafQ *lq, ctComponent *c_, ctComponent **map )
+static
+void 
+ct_queueLeaves( ctLeafQ *lq, ctComponent *c_, ctComponent **map )
 {
   size_t stack_mem_size = 1024, stack_size=1;
   ctComponent ** stack = (ctComponent**) malloc( stack_mem_size * sizeof(ctComponent*) );
@@ -339,8 +359,10 @@ void ct_queueLeaves( ctLeafQ *lq, ctComponent *c_, ctComponent **map )
   }
   free(stack);
 } 
-    
-ctArc * ct_merge( ctContext * ctx )
+
+static
+ctArc * 
+ct_merge( ctContext * ctx )
 {
     ct_checkContext(ctx);
     {
@@ -368,8 +390,8 @@ ctArc * ct_merge( ctContext * ctx )
         size_t *next, *otherNext;
     
         /* these phantom components take care of some special cases */
-        ctComponent * plusInf = ctComponent_new();
-        ctComponent * minusInf = ctComponent_new();
+        ctComponent * plusInf = ctComponent_new(CT_JOIN_COMPONENT);
+        ctComponent * minusInf = ctComponent_new(CT_SPLIT_COMPONENT);
 
         memset(joinMap , 0, sizeof(ctComponent*)*ctx->numVerts);
         memset(splitMap, 0, sizeof(ctComponent*)*ctx->numVerts);
@@ -399,7 +421,7 @@ ctArc * ct_merge( ctContext * ctx )
                 }
         
                 /* which tree is this comp from? */
-                if ( (*(ctx->less))( leaf->birth,leaf->death,ctx->data ) ) { 
+                if ( leaf->type == CT_JOIN_COMPONENT ) {
                     /* comp is join component */
                     map = joinMap;
                     otherMap = splitMap;
@@ -496,8 +518,8 @@ ctArc * ct_merge( ctContext * ctx )
     }
 }
     
-    
-ctBranch * ct_decompose( ctContext * ctx )
+ctBranch * 
+ct_decompose( ctContext * ctx )
 {
     ct_checkContext(ctx);
     if ( ctx->arcMap == 0 ) {
@@ -596,25 +618,27 @@ ctBranch * ct_decompose( ctContext * ctx )
 }
 
 
-
-void ct_checkContext ( ctContext * ctx ) 
+static
+void 
+ct_checkContext ( ctContext * ctx ) 
 {
     assert( ctx->numVerts > 0 );
     assert( ctx->totalOrder );
     assert( ctx->value );
     assert( ctx->neighbors );
-    assert( ctx->less );
 }
 
 
-ctArc ** ct_arcMap(ctContext * ctx)
+ctArc ** 
+ct_arcMap(ctContext * ctx)
 {
     ctArc ** map = ctx->arcMap;
     ctx->arcMap = 0;
     return map;
 }
 
-ctBranch ** ct_branchMap( ctContext * ctx )
+ctBranch ** 
+ct_branchMap( ctContext * ctx )
 {
     ctBranch ** map = ctx->branchMap;
     ctx->branchMap = 0;

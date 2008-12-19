@@ -30,12 +30,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 
-ctComponent * ctComponent_new()
+ctComponent * ctComponent_new( ctComponentType type )
 {
 	ctComponent * c = (ctComponent*) malloc(sizeof(ctComponent));
 	c->birth = c->death = c->last = CT_NIL;
 	c->pred = c->succ = c->nextPred = c->prevPred = NULL;
 	c->uf = c;
+        c->type = type;
 	return c;
 }
 

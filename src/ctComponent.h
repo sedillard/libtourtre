@@ -30,20 +30,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ctMisc.h"
 
+typedef 
+enum ctComponentType 
+{ 
+    CT_JOIN_COMPONENT, CT_SPLIT_COMPONENT 
+} ctComponentType;
+
 typedef struct ctComponent
 {
 	size_t birth, death, last;
 	struct ctComponent *pred, *succ;
 	struct ctComponent *nextPred, *prevPred;
 	struct ctComponent *uf; /* union find */
+        ctComponentType type;
 	void * data; /* user data */
 } ctComponent;
 
-ctComponent*  ctComponent_new          ();
+ctComponent*  ctComponent_new          ( ctComponentType type );
         void  ctComponent_delete       ( ctComponent * self);
         void  ctComponent_addPred      ( ctComponent * self, ctComponent * c );
         void  ctComponent_removePred   ( ctComponent * self, ctComponent * c );
-ctComponent*  ctComponent_eatSuccessor ( ctComponent * self ); /* merges this with successor. this becomes the new, merged component. successor is returned. */
+
+ctComponent*  ctComponent_eatSuccessor ( ctComponent * self ); 
+                /* merges this with successor. this becomes the new, merged
+                 * component. successor is returned. */
+
         void  ctComponent_prune        ( ctComponent * self );
          int  ctComponent_isLeaf       ( ctComponent * self );
          int  ctComponent_isRegular    ( ctComponent * self );
