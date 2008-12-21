@@ -1,3 +1,5 @@
 libtourtre
 
 Look in ./doc/html/index.html for documentation.
+ 
+If it doesn't exist, run doxygen

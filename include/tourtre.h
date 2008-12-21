@@ -208,7 +208,7 @@ ctBranch ** ct_branchMap( ctContext * ctx );
 
 
 
-/** This is some doxygen stuff. You can ignore it. */
+
 /**  
     \mainpage libtourtre: A Contour Tree Library
     \image html tourtre.jpg
