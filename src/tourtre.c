@@ -138,11 +138,9 @@ ctArc * ct_sweepAndMerge( ctContext * ctx )
     {
         ctArc * ret;
         
-        printf("join sweep\n");
         ctx->joinRoot = 
             ct_sweep( 0,ctx->numVerts,+1,
                 CT_JOIN_COMPONENT, ctx->joinComps, ctx->nextJoin, ctx  );
-        printf("split sweep\n");
         ctx->splitRoot = 
             ct_sweep( ctx->numVerts-1,-1,-1, 
                 CT_SPLIT_COMPONENT, ctx->splitComps, ctx->nextSplit, ctx );
@@ -600,7 +598,8 @@ ct_decompose( ctContext * ctx )
     
         { /* create branch map */
             size_t i;
-            ctx->branchMap = (ctBranch**) (ctx->joinComps); /* reuse this memory */
+            /* ctx->branchMap = (ctBranch**) (ctx->joinComps);*/
+            /* reuse this memory */
             for ( i = 0; i < ctx->numVerts; i++) {
                 ctArc * a = ctx->arcMap[i];
                 assert(a);
@@ -642,7 +641,6 @@ ct_branchMap( ctContext * ctx )
 {
     ctBranch ** map = ctx->branchMap;
     ctx->branchMap = 0;
-        ctx->joinComps = 0; /* branchMap and joinComps share memory */
     return map;    
 }
 

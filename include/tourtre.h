@@ -208,7 +208,6 @@ ctBranch ** ct_branchMap( ctContext * ctx );
 
 
 
-
 /**  
     \mainpage libtourtre: A Contour Tree Library
     \image html tourtre.jpg

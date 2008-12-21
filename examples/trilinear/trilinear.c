@@ -1,3 +1,29 @@
+/*
+Copyright (c) 2009, Scott E. Dillard
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+ are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 /* NOTE: this is C99 */
 
 #include <stdbool.h> /* for bool, true, false */
@@ -11,8 +37,8 @@
 #include "trilinear.h"
 #include "sglib.h"
 
-#define CONSOLE_FEEDBACK 1
-#define CHATTY 1
+#define CONSOLE_FEEDBACK 0
+#define CHATTY 0
 
 #define OPT 0 //0 actually means yes
 
@@ -29,19 +55,48 @@
 
 
 
-typedef struct Saddle Saddle;
-typedef struct BlockMap BlockMap;
-
-enum SaddleType
+typedef 
+enum SortOrder
 { 
-  YZ_FACE_SADDLE = 0, 
-  XZ_FACE_SADDLE, 
-  XY_FACE_SADDLE, 
-  LO_BODY_SADDLE, 
-  HI_BODY_SADDLE 
+    SORT_NATURALLY = 0 ,
+    SORT_BEFORE ,
+    SORT_AFTER 
+} SortOrder;
+
+
+struct Saddle
+{ 
+    size_t key;
+        /* the lower,left,front vertex of the cell containing this saddle */
+
+    Saddle *left,*right; /* tree pointers */
+    int color; /* red or black */ 
+
+    size_t vert; 
+        /* this saddle's vertex id */
+
+    SaddleType type;
+    double value;
+    double pos[3]; /* approximate */
+
+    int orientation; 
+        /* For pairs of body saddles: 
+         *   Indicates the vector (a diagonal of the cube) separating them 
+         * For face saddles: 
+         *   If the saddle is 'fake' (caused by perturbation) this indicates
+         *   whether the 'saddle' is at the lower (0) or upper (1) vertex of the
+         *   face. 
+         */
+
+    SortOrder sort; 
+        /* Does this saddle have a prescirbed position in the total order? */
+    size_t whom;
+        /* If so, whom does it need to sort after/before? */
+
+    /* TODO this thing is way bigger than it needs to be. The fields sort,
+     * orientation, type and color can all be packed into a word */
 };
 
-typedef enum SaddleType SaddleType;
 
 
 /* A search tree is used to map cells to saddles. As an optimization, we break
@@ -60,48 +115,8 @@ struct BlockMap
   /* The tree is referenced by a pointer to the root node. Saddles are nodes,
    * so an array of trees is an array of Saddle pointers. */
 }; 
+typedef struct BlockMap BlockMap;
 
-typedef 
-enum SortOrder
-{ 
-    SORT_NATURALLY = 0 ,
-    SORT_BEFORE ,
-    SORT_AFTER 
-} SortOrder;
-
-struct Saddle
-{ 
-    /* this structure is initialized by create_saddle */
-
-    size_t key;
-        /* the lower,left,front vertex of the cell containing this saddle */
-        /* This is the key used to store Saddles in the BlockMap */
-    Saddle *left,*right; /* tree pointers */
-    int color; /* red or black */ 
-
-    size_t vert; 
-        /* this saddle's vertex id */
-
-    SaddleType type;
-    double value;
-
-    int orientation; 
-        /* For pairs of body saddles: 
-         *   Indicates the vector (a diagonal of the cube) separating them 
-         * For face saddles: 
-         *   If the saddle is 'fake' (caused by perturbation) this indicates
-         *   whether the 'saddle' is at the lower (0) or upper (1) vertex of the
-         *   face. 
-         */
-
-    SortOrder sort; 
-        /* Does this saddle have a prescirbed position in the total order? */
-    size_t whom;
-        /* If so, whom does it need to sort after/before? */
-
-    /* TODO this thing is way bigger than it needs to be. The fields sort,
-     * orientation, type and color can all be packed into a word */
-}; 
 
 #define NO_ORIENTATION 0xffffffff
 
@@ -137,6 +152,17 @@ struct TrilinearGraph
 };
 
 
+int
+tl_get_saddle_info( TrilinearGraph *g, size_t i, SaddleInfo *info )
+{
+    if (i < g->nvoxels || i >= g->nverts) return 0;
+    Saddle *s = g->saddles[ i - g->nvoxels ];
+    info->type = s->type;
+    info->where = s->key;
+    memcpy(info->location,s->pos,3*sizeof(double));
+    info->value = s->value;
+    return 1;
+}
 
 
 
@@ -144,15 +170,27 @@ struct TrilinearGraph
 /* local functions */
 static Saddle*  check_for_saddle ( TrilinearGraph* g, SaddleType t, size_t x, size_t y, size_t z );
 static void     find_saddles ( TrilinearGraph* graph );
-static Saddle*  create_saddle ( TrilinearGraph* graph, SaddleType type, size_t loc[3], double value, int orientation, SortOrder sort, size_t whom );
+
+static Saddle*  create_saddle ( TrilinearGraph* graph, SaddleType type, size_t loc[3], double value, 
+                                int orientation, SortOrder sort, size_t whom, double pos[3] );
+
 static void     convert_index_inv ( const size_t size[], size_t id, size_t *x, size_t *y, size_t *z );
 static size_t   convert_index_a ( const size_t size[], const size_t index[] );
 static size_t   convert_index ( const size_t size[], size_t x, size_t y, size_t z );
-static int      find_body_saddles ( Values data, double saddle_values[ 2 ], size_t verts[8], int *orientation );
-static bool     find_face_saddle ( TrilinearGraph* g, const size_t v[8], const size_t fv[4], double *saddle_val, int *orientation, SortOrder *sort, size_t *whom );
+
+static int      find_body_saddles ( Values data, double saddle_values[ 2 ], size_t verts[8], 
+                                    int *orientation, double pos[2][3] );
+
+static bool     find_face_saddle ( TrilinearGraph* g, const size_t v[8], const size_t fv[4], 
+                                   double *saddle_val, int *orientation, SortOrder *sort, 
+                                   size_t *whom, double *pos0, double *pos1 );
+
 static int      orient_cell_to_saddles ( double pos[2][3], double values[2] ) ;
 static double   eval_trilinear ( double pos[3], double c[8] ) ;
-static Saddle** block_lookup ( const BlockMap* bm, const size_t block_size[3], const size_t nblocks[3], const size_t loc[3] );
+
+static Saddle** block_lookup ( const BlockMap* bm, const size_t block_size[3], 
+                               const size_t nblocks[3], const size_t loc[3] );
+
 static double   square_root ( double x );
 static bool     compare ( TrilinearGraph *g, size_t, size_t );
 static void     sort_grid_verts ( TrilinearGraph *g , size_t a[], size_t n,  size_t *t );
@@ -247,19 +285,7 @@ tl_create_trilinear_graph
     size_t aux_size = tg->nvoxels / 2 + 1; /* temp space for merge sort */
     size_t *aux = (size_t*)malloc(aux_size*sizeof(size_t));
     sort_grid_verts(tg,tg->order,tg->nvoxels,aux);
-    
-    /* debug */
-    /*
-    for (size_t i=0; i<tg->nvoxels-1; ++i) 
-        assert( tg->data[tg->order[i]] <= tg->data[tg->order[i+1]] );
-    */
 
-    /*
-    printf("initial grid vert sort:\n");
-    for (size_t i=0; i<tg->nvoxels; ++i)
-        printf("#%3u, %3u, val = %3u\n",i,tg->order[i], tg->data[tg->order[i]]);
-    printf("\n");
-    */
 
     #if CONSOLE_FEEDBACK && CHATTY 
     printf("\ninitial sort (saddles)\n");
@@ -273,14 +299,6 @@ tl_create_trilinear_graph
     sort_saddles(tg,saddle_inds,tg->nsaddles,aux);
     free(aux);
 
-    /*
-    printf("initial saddle sort:\n");
-    for (size_t i=0; i<tg->nsaddles; ++i) {
-        Saddle *s = tg->saddles[saddle_inds[i]];
-        printf("#%3u, %3u, val = %4lf, sort = %d, whom = %3u\n",i,saddle_inds[i], s->value, s->sort, s->whom);
-    }
-    printf("\n");
-    */
 
     #if CONSOLE_FEEDBACK && CHATTY 
     printf("\nmerging sorted lists\n");
@@ -289,26 +307,6 @@ tl_create_trilinear_graph
     /* finally merge the two sorted lists. */
     merge_saddles_into_order(tg,tg->order,saddle_inds);
     free(saddle_inds);
-
-    /*
-    printf("after merge:\n");
-    for (size_t i=0; i<tg->nverts; ++i) {
-        if (tg->order[i] < tg->nvoxels) {
-            printf("#%3u, %3u, val = %3u\n",i,tg->order[i], tg->data[tg->order[i]]);
-        } else {
-            Saddle *s = tg->saddles[tg->order[i]-tg->nvoxels];
-            printf("#%3u, %3u, val = %4lf, sort = %d, whom = %3u\n",i,tg->order[i], s->value, s->sort, s->whom);
-        }
-    }
-    */ 
-
-    /* for (size_t i=0; i<tg->nverts; ++i) tg->iorder[ tg->order[i] ] = i; */
-
-    /* debug */
-    /*
-    for (size_t i=0; i<tg->nverts-1; ++i) 
-        assert( tl_total_order(tg, tg->order[i], tg->order[i+1]) );
-    */
 
     /* Output. Ownership of tg->order is passed to caller. */
     *sorted_inds = tg->order;
@@ -356,7 +354,6 @@ static const size_t xy_face_verts[4] = { 0,1,2,3 };
 int 
 tl_total_order( TrilinearGraph *g, int a, int b )
 {
-    printf("WTF!\n"); fflush(stdout);
     return g->iorder[a] < g->iorder[b];
 }
 
@@ -387,7 +384,9 @@ find_face_saddle
     double *saddle_val, 
     int *orientation  ,
     SortOrder *sort ,
-    size_t *whom )
+    size_t *whom ,
+    double *loc0 ,
+    double *loc1 )
 {
   Values f = g->data;
   bool e[4] = {
@@ -414,6 +413,8 @@ find_face_saddle
             assert( *saddle_val != val[3] );
             *sort = SORT_NATURALLY;
             *whom = (size_t)-1;
+            *loc0 = x;
+            *loc1 = y;
 
             return true;
         }
@@ -513,12 +514,13 @@ int
 find_body_saddles 
 (   Values data, 
     double saddle_values[ 2 ], 
-    size_t verts[8], int *orientation )
+    size_t verts[8], 
+    int *orientation ,
+    double pos[2][3] )
 {
   double v[8]; /*function values at vertices*/
   for (size_t i=0; i<8; i++) v[i] = data[ verts[i] ]; 
 
-  double pos[2][3];
   double ax,ay,az;
 
   #if DOUBLE_CHECK_SADDLES
@@ -718,7 +720,8 @@ create_saddle
     double value, 
     int orientation,
     SortOrder sort,
-    size_t whom )
+    size_t whom,
+    double pos[3] )
 {
     /*create saddle record*/
     Saddle *s = (Saddle*)malloc(sizeof(Saddle));
@@ -733,6 +736,8 @@ create_saddle
     s->orientation = orientation;
     s->sort = sort;
     s->whom = whom;
+
+    for (int i=0; i<3; ++i) s->pos[i] = pos[i]+loc[i];
 
     /*map loc to saddle*/
     s->key = convert_index_a(g->domain_size, loc);
@@ -809,38 +814,59 @@ find_saddles ( TrilinearGraph* g )
 
         /* find YZ face saddle */
         if ( y < size[1]-1 && z < size[2]-1 ) {
-            if ( find_face_saddle( g, verts, yz_face_verts, &saddle_value, &orientation, &sort, &whom ) ) {
-                create_saddle( g, YZ_FACE_SADDLE, loc, saddle_value, orientation, sort, whom );
+            double pos[3]={0,0,0};
+            if ( find_face_saddle( 
+                    g, verts, yz_face_verts, 
+                    &saddle_value, &orientation, &sort, &whom, pos+1,pos+2 ) ) 
+            {
+                for (int i=0; i<3; ++i) pos[i] += loc[i];
+                create_saddle( g, YZ_FACE_SADDLE, loc, saddle_value, orientation, sort, whom, pos );
             }
         }
         
         /* find XZ face saddle */
         if ( x < size[0]-1 && z < size[2]-1 ) {
-            if ( find_face_saddle( g, verts, xz_face_verts, &saddle_value, &orientation, &sort, &whom ) ) {
-                create_saddle( g, XZ_FACE_SADDLE, loc, saddle_value, orientation, sort, whom );
+            double pos[3]={0,0,0};
+            if ( find_face_saddle( 
+                    g, verts, xz_face_verts, 
+                    &saddle_value, &orientation, &sort, &whom, pos+0, pos+2 ) ) 
+            {
+                create_saddle( 
+                    g, XZ_FACE_SADDLE, loc, saddle_value, orientation, sort, whom, pos );
             }
         }
         
         /* find XY face saddle */
         if ( x < size[0]-1 && y < size[1]-1 ) {
-            if ( find_face_saddle( g, verts, xy_face_verts, &saddle_value, &orientation, &sort, &whom ) ) {
-                create_saddle( g, XY_FACE_SADDLE, loc, saddle_value, orientation, sort, whom );
+            double pos[3]={0,0,0};
+            if ( find_face_saddle( 
+                    g, verts, xy_face_verts, 
+                    &saddle_value, &orientation, &sort, &whom, pos+0, pos+1 ) ) 
+            {
+                create_saddle( 
+                    g, XY_FACE_SADDLE, loc, saddle_value, orientation, sort, whom, pos );
             }
         }
         if ( x < size[0]-1 && y < size[1]-1 && z < size[2]-1 ) {
             /*find cell saddles*/
             double saddle_values[2];
-            size_t nsaddles = find_body_saddles(data,saddle_values,verts,&orientation);
+            double pos[2][3];
+            size_t nsaddles = find_body_saddles(data,saddle_values,verts,&orientation,pos);
             if (nsaddles == 1) {
-                create_saddle( g, LO_BODY_SADDLE, loc, saddle_values[0], NO_ORIENTATION, SORT_NATURALLY, (size_t)-1 );
+                create_saddle( g, LO_BODY_SADDLE, loc, saddle_values[0], NO_ORIENTATION, 
+                               SORT_NATURALLY, (size_t)-1, pos[0] );
             }
             if (nsaddles == 2) { /*figure out which saddle is lower and which is higher*/
                 if (saddle_values[0] < saddle_values[1]) {
-                    create_saddle( g, LO_BODY_SADDLE, loc, saddle_values[0], orientation    , SORT_NATURALLY, (size_t)-1);
-                    create_saddle( g, HI_BODY_SADDLE, loc, saddle_values[1], ~orientation&7 , SORT_NATURALLY, (size_t)-1);
+                    create_saddle( g, LO_BODY_SADDLE, loc, saddle_values[0], orientation , 
+                                   SORT_NATURALLY, (size_t)-1, pos[0]);
+                    create_saddle( g, HI_BODY_SADDLE, loc, saddle_values[1], ~orientation&7 , 
+                                   SORT_NATURALLY, (size_t)-1, pos[1]);
                 } else {
-                    create_saddle( g, LO_BODY_SADDLE, loc, saddle_values[1], ~orientation&7 , SORT_NATURALLY, (size_t)-1);
-                    create_saddle( g, HI_BODY_SADDLE, loc, saddle_values[0], orientation    , SORT_NATURALLY, (size_t)-1);
+                    create_saddle( g, LO_BODY_SADDLE, loc, saddle_values[1], ~orientation&7 , 
+                                   SORT_NATURALLY, (size_t)-1, pos[1]);
+                    create_saddle( g, HI_BODY_SADDLE, loc, saddle_values[0], orientation , 
+                                   SORT_NATURALLY, (size_t)-1, pos[0]);
                 }
             }		
         }
@@ -858,6 +884,7 @@ find_saddles ( TrilinearGraph* g )
              s[1]->orientation == 0 &&
              s[2]->orientation == 0 )
         {
+            double pos[3]={0,0,0};
             Saddle *bs = check_for_saddle(g,LO_BODY_SADDLE,x,y,z);
             if (! bs )  {
 
@@ -874,7 +901,7 @@ find_saddles ( TrilinearGraph* g )
                 size_t v = convert_index(g->domain_size,x,y,z);
                 create_saddle(g,
                     HI_BODY_SADDLE, (size_t[]){x,y,z},
-                    g->data[v], 0, SORT_BEFORE, v );
+                    g->data[v], 0, SORT_BEFORE, v, pos );
             }
         }
     }
@@ -890,6 +917,7 @@ find_saddles ( TrilinearGraph* g )
              s[1]->orientation == 1 &&
              s[2]->orientation == 1 )
         {
+            double pos[3]={1,1,1};
             Saddle *bs = check_for_saddle(g,LO_BODY_SADDLE,x-1,y-1,z-1);
             if (! bs )  {
                 
@@ -908,7 +936,7 @@ find_saddles ( TrilinearGraph* g )
                 size_t v = convert_index(g->domain_size,x,y,z);
                 create_saddle(g,
                     LO_BODY_SADDLE, (size_t[]){x-1,y-1,z-1},
-                    g->data[v], 7, SORT_AFTER, v );
+                    g->data[v], 7, SORT_AFTER, v, pos );
             }
         }
     }
