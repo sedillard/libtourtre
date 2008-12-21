@@ -1,6 +1,6 @@
 CC = gcc
 CPPFLAGS = -I./include
-CFLAGS = -ansi -pedantic -Wall -Werror -fPIC -g
+CFLAGS = -ansi -pedantic -Wall -Werror -fPIC -O2
 
 AR = ar
 ARFLAGS = -q

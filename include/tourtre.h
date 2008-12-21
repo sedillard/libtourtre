@@ -245,9 +245,9 @@ ctBranch ** ct_branchMap( ctContext * ctx );
     interpolated images. For general image data, your best (easiest) bet is to
     impose a simplicial domain over the image.
 
-    A noteworthy feature of this library is that it produces a mapping from
-    vertices of the domain to arcs (branches) of the contour tree (branch
-    decomposition), which can be very handy.
+    A feature of this library is that it produces a mapping from vertices of
+    the domain to arcs (branches) of the contour tree (branch decomposition),
+    which can be very handy.
 
     The algorithms in the library are serial, but the library is reentrant,
     should you need to compute another contour tree in one of the callbacks ...
@@ -265,8 +265,8 @@ ctBranch ** ct_branchMap( ctContext * ctx );
 
     \section Download
     
-    The latest version is v9. Download it 
-    \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v9.tar.gz">here</a>. \endhtmlonly 
+    The latest version is v10. Download it 
+    \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v10.tar.gz">here</a>. \endhtmlonly 
 
     There is an API change from v8 (which is still available 
     \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v8.tar.gz">here</a>. \endhtmlonly 

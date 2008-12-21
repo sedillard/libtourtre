@@ -1,6 +1,6 @@
 CC = gcc
 CPPFLAGS = -I../../include
-CFLAGS = -std=c99 -Wall -Werror -g
+CFLAGS = -std=c99 -Wall -Werror -O2
 
 tltree : main.o trilinear.o 
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ -static -ltourtre -L../../ -I../../include -lm

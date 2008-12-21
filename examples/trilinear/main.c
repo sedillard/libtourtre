@@ -208,7 +208,6 @@ usage: tltree ncols nrows nstacks infile [outfile]\n\
 int
 main (int argc, char *argv[]) 
 {
-    print_header_comment(stdout);
     if (argc < 5) print_usage_and_exit();
    
     int sizei[3];
