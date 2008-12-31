@@ -6,6 +6,8 @@
 #include "ctBranch.h"
 #include "ctComponent.h"
 #include "ctQueue.h"
+#include "ctNodeMap.h"
+
 
 struct ctContext 
 {
@@ -82,8 +84,7 @@ struct ctContext
     
     
     /* 
-     * Working memory used during the construction process. Uses approximately
-     * 4*numVertex machine words. This may change.
+     * Working memory used during the construction process. 
      */
     size_t numVerts;
     ctComponent *joinRoot, *splitRoot;
@@ -91,7 +92,7 @@ struct ctContext
     size_t *nextJoin, *nextSplit;
     ctArc ** arcMap;
     ctBranch ** branchMap;
-    ctNode ** nodeMap;
+    ctNodeMap *nodeMap;
 
 };
 

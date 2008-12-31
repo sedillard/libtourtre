@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ctComponent.h"
 #include "ctAlloc.h"
 #include "ctContext.h"
+#include "ctNodeMap.h"
 
 /* local functions */
 static
@@ -110,10 +111,8 @@ ct_init
 
     ctx->arcMap = (ctArc**) calloc( ctx->numVerts, sizeof(ctArc*) );
     memset( (void*)ctx->arcMap, 0, sizeof(ctArc*)*ctx->numVerts );
-    
-    ctx->nodeMap = (ctNode**) calloc( ctx->numVerts, sizeof(ctNode*) );
-    memset( (void*)ctx->nodeMap, 0, sizeof(ctNode*)*ctx->numVerts );
    
+    ctx->nodeMap = 0;
     ctx->branchMap = 0;
     
     return ctx;
@@ -128,7 +127,7 @@ void ct_cleanup( ctContext * ctx )
     
     if ( ctx->arcMap != NULL )    free(ctx->arcMap);
     if ( ctx->branchMap != NULL ) free(ctx->branchMap);
-    if ( ctx->nodeMap != NULL )   free(ctx->nodeMap);
+    if ( ctx->nodeMap != NULL )   ctNodeMap_delete(ctx->nodeMap);
 }
 
 ctArc * ct_sweepAndMerge( ctContext * ctx )
@@ -360,14 +359,6 @@ ct_queueLeaves( ctLeafQ *lq, ctComponent *c_, ctComponent **map )
 
 
 
-typedef
-struct NodeMap
-{
-    NodeMap *left;
-    NodeMap *right;
-    struct { unsigned key : 31, unsigned color : 1 } info;
-    ctNode *node;
-} NodeMap;
 
 
 
@@ -394,7 +385,6 @@ ct_checkContext(ctx);
     ctComponent **splitMap = ctx->splitComps;
     
     ctArc ** arcMap = ctx->arcMap;
-    ctNode ** nodeMap = ctx->nodeMap;
     ctLeafQ * leafQ = ctLeafQ_new(0);
 
     /* these are set to the above variables, depending of if the leaf is
@@ -439,37 +429,30 @@ ct_checkContext(ctx);
                 map = joinMap;
                 otherMap = splitMap;
                 next = nextJoin;
-                
-                lo = nodeMap[leaf->birth];
-                hi = nodeMap[leaf->death];
-                
+                lo = ctNodeMap_find(ctx->nodeMap,leaf->birth);
+                hi = ctNodeMap_find(ctx->nodeMap,leaf->death);
                 if (!lo) {
                     lo = ctNode_new(leaf->birth,ctx);
-                    nodeMap[leaf->birth] = lo;
+                    ctNodeMap_insert(&ctx->nodeMap,leaf->birth,lo);
                 }
                 if (!hi) {
                     hi = ctNode_new(leaf->death,ctx);
-                    nodeMap[leaf->death] = hi;
+                    ctNodeMap_insert(&ctx->nodeMap,leaf->death,hi);
                 }
-    
             } else { /* split component */
-    
                 map = splitMap;
                 otherMap = joinMap;
                 next = nextSplit;
-                
-                hi = nodeMap[leaf->birth];
-                lo = nodeMap[leaf->death];
-                
+                hi = ctNodeMap_find(ctx->nodeMap,leaf->birth);
+                lo = ctNodeMap_find(ctx->nodeMap,leaf->death);
                 if (!hi) {
                     hi = ctNode_new(leaf->birth,ctx);
-                    nodeMap[leaf->birth] = hi;
+                    ctNodeMap_insert(&ctx->nodeMap,leaf->birth,hi);
                 }
                 if (!lo) {
                     lo = ctNode_new(leaf->death,ctx);
-                    nodeMap[leaf->death] = lo;
+                    ctNodeMap_insert(&ctx->nodeMap,leaf->death,lo);
                 }
-            
             }
             
             /* create arc */
@@ -544,15 +527,9 @@ if ( ctx->arcMap == 0 ) {
 }
 
 {
-    ctPriorityQ * pq = ctPriorityQ_new();
     ctBranch * root = 0;
-
-    { /* init priority q with the leaves */
-        size_t i;
-        for ( i = 0; i < ctx->numVerts; i++)
-            if ( ctx->nodeMap[i] && ctNode_isLeaf( ctx->nodeMap[i] ) )
-                ctPriorityQ_push( pq, ctx->nodeMap[i], ctx );
-    }
+    ctPriorityQ * pq = ctPriorityQ_new();
+    ctNodeMap_push_leaves(ctx->nodeMap,pq,ctx);
 
     while( 1 ) {
         ctNode * n = ctPriorityQ_pop(pq,ctx);
