@@ -40,7 +40,7 @@ src/trilinear.o : src/trilinear.c src/trilinear.h src/sglib.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@ 
 
 clean :
-	-rm -rf src/*.o libtourtre.a libtourtre.so doc
+	-rm -rf src/*.o libtourtre.a libtourtre.so doc/html
 
 	
 # src/test : 	libtourtre.a test/test.c

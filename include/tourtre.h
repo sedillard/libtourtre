@@ -46,7 +46,6 @@ typedef struct ctContext ctContext;
 
 
 
-
 /** 
 Call this first. This function provides the needed data and callbacks to the
 library, so that it can compute the contour tree of your...whatever it is. This
@@ -195,6 +194,9 @@ ctArc ** ct_arcMap( ctContext * ctx );
  * free the branch map memory and ct_branchMap will return null
  **/
 ctBranch ** ct_branchMap( ctContext * ctx );
+
+
+
 
 
 #endif

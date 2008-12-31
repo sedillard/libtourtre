@@ -113,9 +113,8 @@ ct_init
     
     ctx->nodeMap = (ctNode**) calloc( ctx->numVerts, sizeof(ctNode*) );
     memset( (void*)ctx->nodeMap, 0, sizeof(ctNode*)*ctx->numVerts );
-    
-    ctx->branchMap = (ctBranch**) calloc( ctx->numVerts, sizeof(ctBranch*) );
-    memset( (void*)ctx->branchMap, 0, sizeof(ctBranch*)*ctx->numVerts );
+   
+    ctx->branchMap = 0;
     
     return ctx;
 }
@@ -358,263 +357,284 @@ ct_queueLeaves( ctLeafQ *lq, ctComponent *c_, ctComponent **map )
   free(stack);
 } 
 
+
+
+
+typedef
+struct NodeMap
+{
+    NodeMap *left;
+    NodeMap *right;
+    struct { unsigned key : 31, unsigned color : 1 } info;
+    ctNode *node;
+} NodeMap;
+
+
+
+
+
 static
 ctArc * 
 ct_merge( ctContext * ctx )
 {
-    ct_checkContext(ctx);
-    {
-        /* these are temp variables used in the loop */
-        ctNode * hi = NULL;
-        ctNode * lo = NULL;
-        ctArc * arc = NULL;
-    
-        /* save some keystrokes on ctx-> */
-        ctComponent *joinRoot = ctx->joinRoot;
-        ctComponent *splitRoot = ctx->splitRoot;
-        size_t *nextJoin = ctx->nextJoin;
-        size_t *nextSplit = ctx->nextSplit;
-    
-        ctComponent **joinMap = ctx->joinComps;
-        ctComponent **splitMap = ctx->splitComps;
-        
-        ctArc ** arcMap = ctx->arcMap;
-        ctNode ** nodeMap = ctx->nodeMap;
-        ctLeafQ * leafQ = ctLeafQ_new(0);
-    
-        /* these are set to the above variables, depending of if the leaf is
-         * from the join or split tree */
-        ctComponent **map, **otherMap;
-        size_t *next, *otherNext;
-    
-        /* these phantom components take care of some special cases */
-        ctComponent * plusInf = ctComponent_new(CT_JOIN_COMPONENT);
-        ctComponent * minusInf = ctComponent_new(CT_SPLIT_COMPONENT);
+ct_checkContext(ctx);
+{
+    /* these are temp variables used in the loop */
+    ctNode * hi = NULL;
+    ctNode * lo = NULL;
+    ctArc * arc = NULL;
 
-        memset(joinMap , 0, sizeof(ctComponent*)*ctx->numVerts);
-        memset(splitMap, 0, sizeof(ctComponent*)*ctx->numVerts);
-            
-        ctComponent_addPred( plusInf, joinRoot );
-        plusInf->birth = joinRoot->death;
-        joinRoot->succ = plusInf;
-        joinMap[joinRoot->death] = plusInf;
-    
-        ctComponent_addPred( minusInf, splitRoot );
-        minusInf->birth = splitRoot->death;
-        splitRoot->succ = minusInf;
-        splitMap[splitRoot->death] = minusInf;
+    /* save some keystrokes on ctx-> */
+    ctComponent *joinRoot = ctx->joinRoot;
+    ctComponent *splitRoot = ctx->splitRoot;
+    size_t *nextJoin = ctx->nextJoin;
+    size_t *nextSplit = ctx->nextSplit;
 
-        ct_queueLeaves(leafQ, joinRoot, joinMap);
-        ct_queueLeaves(leafQ, splitRoot, splitMap);
-                
-        while(1) {
-            assert(! ctLeafQ_isEmpty(leafQ) );
-            {
-                /* pop leaf from q */
-                ctComponent * leaf = ctLeafQ_popFront(leafQ);
-
-                if (leaf->death == CT_NIL) { /* all done */
-                    arcMap[ leaf->birth ] = arc;
-                    break;
-                }
-        
-                /* which tree is this comp from? */
-                if ( leaf->type == CT_JOIN_COMPONENT ) {
-                    /* comp is join component */
-                    map = joinMap;
-                    otherMap = splitMap;
-                    next = nextJoin;
-                    otherNext = nextSplit;
-                    
-                    lo = nodeMap[leaf->birth];
-                    hi = nodeMap[leaf->death];
-                    
-                    if (!lo) {
-                        lo = ctNode_new(leaf->birth,ctx);
-                        nodeMap[leaf->birth] = lo;
-                    }
-                    if (!hi) {
-                        hi = ctNode_new(leaf->death,ctx);
-                        nodeMap[leaf->death] = hi;
-                    }
-        
-                } else { /* split component */
-        
-                    map = splitMap;
-                    otherMap = joinMap;
-                    next = nextSplit;
-                    otherNext = nextJoin;
-                    
-                    hi = nodeMap[leaf->birth];
-                    lo = nodeMap[leaf->death];
-                    
-                    if (!hi) {
-                        hi = ctNode_new(leaf->birth,ctx);
-                        nodeMap[leaf->birth] = hi;
-                    }
-                    if (!lo) {
-                        lo = ctNode_new(leaf->death,ctx);
-                        nodeMap[leaf->death] = lo;
-                    }
-                
-                }
-                
-                /* create arc */
-                arc = ctArc_new(hi,lo,ctx);
-                ctNode_addDownArc(hi,arc);
-                ctNode_addUpArc(lo,arc);
-                
-                /* printf("arc: %lu to %lu\n", hi->i, lo->i ); */
-                
-                { /* gather up points for new arc */
-                    size_t c;
-                    for( c = leaf->birth; c != leaf->death; c = next[c] ) {
-                        if (arcMap[c] == NULL) {
-                            arcMap[c] = arc;
-                            if (ctx->procVertex) (*(ctx->procVertex))( c, arc, ctx->data );
-                        }
-                    }
-                }
-                
-                {    /* remove leaf */
-                    ctComponent *succ = leaf->succ;
-                    ctComponent *other, *garbage;
+    ctComponent **joinMap = ctx->joinComps;
+    ctComponent **splitMap = ctx->splitComps;
     
-                    ctComponent_prune( leaf );
+    ctArc ** arcMap = ctx->arcMap;
+    ctNode ** nodeMap = ctx->nodeMap;
+    ctLeafQ * leafQ = ctLeafQ_new(0);
+
+    /* these are set to the above variables, depending of if the leaf is
+        * from the join or split tree */
+    ctComponent **map, **otherMap;
+    size_t *next; 
+
+    /* these phantom components take care of some special cases */
+    ctComponent * plusInf = ctComponent_new(CT_JOIN_COMPONENT);
+    ctComponent * minusInf = ctComponent_new(CT_SPLIT_COMPONENT);
+
+    memset(joinMap , 0, sizeof(ctComponent*)*ctx->numVerts);
+    memset(splitMap, 0, sizeof(ctComponent*)*ctx->numVerts);
+        
+    ctComponent_addPred( plusInf, joinRoot );
+    plusInf->birth = joinRoot->death;
+    joinRoot->succ = plusInf;
+    joinMap[joinRoot->death] = plusInf;
+
+    ctComponent_addPred( minusInf, splitRoot );
+    minusInf->birth = splitRoot->death;
+    splitRoot->succ = minusInf;
+    splitMap[splitRoot->death] = minusInf;
+
+    ct_queueLeaves(leafQ, joinRoot, joinMap);
+    ct_queueLeaves(leafQ, splitRoot, splitMap);
             
-                    /* remove leaf's counterpart in other tree */
-                    other = otherMap[leaf->birth];
-                    assert(other);
-                    assert(ctComponent_isRegular(other)) ;
+    while(1) {
+        assert(! ctLeafQ_isEmpty(leafQ) );
+        {
+            /* pop leaf from q */
+            ctComponent * leaf = ctLeafQ_popFront(leafQ);
+
+            if (leaf->death == CT_NIL) { /* all done */
+                arcMap[ leaf->birth ] = arc;
+                break;
+            }
+    
+            /* which tree is this comp from? */
+            if ( leaf->type == CT_JOIN_COMPONENT ) {
+                /* comp is join component */
+                map = joinMap;
+                otherMap = splitMap;
+                next = nextJoin;
+                
+                lo = nodeMap[leaf->birth];
+                hi = nodeMap[leaf->death];
+                
+                if (!lo) {
+                    lo = ctNode_new(leaf->birth,ctx);
+                    nodeMap[leaf->birth] = lo;
+                }
+                if (!hi) {
+                    hi = ctNode_new(leaf->death,ctx);
+                    nodeMap[leaf->death] = hi;
+                }
+    
+            } else { /* split component */
+    
+                map = splitMap;
+                otherMap = joinMap;
+                next = nextSplit;
+                
+                hi = nodeMap[leaf->birth];
+                lo = nodeMap[leaf->death];
+                
+                if (!hi) {
+                    hi = ctNode_new(leaf->birth,ctx);
+                    nodeMap[leaf->birth] = hi;
+                }
+                if (!lo) {
+                    lo = ctNode_new(leaf->death,ctx);
+                    nodeMap[leaf->death] = lo;
+                }
             
-                    garbage = ctComponent_eatSuccessor(other->pred);
-                    if (garbage != plusInf && garbage != minusInf) ctComponent_delete( garbage );
+            }
             
-                    if ( ctComponent_isLeaf(succ) 
-                       && ctComponent_isRegular( otherMap[succ->birth] ) )  
-                    {
-                        ctLeafQ_pushBack(leafQ, succ);
-                    } else if (ctComponent_isRegular(succ) 
-                              && ctComponent_isLeaf(otherMap[succ->birth])) 
-                    {
-                        ctComponent * osb = otherMap[succ->birth];
-                        ctLeafQ_pushBack(leafQ, osb);
+            /* create arc */
+            arc = ctArc_new(hi,lo,ctx);
+            ctNode_addDownArc(hi,arc);
+            ctNode_addUpArc(lo,arc);
+            
+            { /* gather up points for new arc */
+                size_t c;
+                for( c = leaf->birth; c != leaf->death; c = next[c] ) {
+                    if (arcMap[c] == NULL) {
+                        arcMap[c] = arc;
+                        if (ctx->procVertex) (*(ctx->procVertex))( c, arc, ctx->data );
                     }
-            
-                    ctComponent_delete(leaf);
                 }
             }
-        }
-    
-        ctx->joinRoot = 0;
-        ctx->splitRoot = 0;
-        ctComponent_delete( plusInf );
-        ctComponent_delete( minusInf );
-        ctLeafQ_delete( leafQ );
+            
+            {    /* remove leaf */
+                ctComponent *succ = leaf->succ;
+                ctComponent *other, *garbage;
+
+                ctComponent_prune( leaf );
         
-        return arc;
+                /* remove leaf's counterpart in other tree */
+                other = otherMap[leaf->birth];
+                assert(other);
+                assert(ctComponent_isRegular(other)) ;
+        
+                garbage = ctComponent_eatSuccessor(other->pred);
+                if (garbage != plusInf && garbage != minusInf) ctComponent_delete( garbage );
+        
+                if ( ctComponent_isLeaf(succ) 
+                    && ctComponent_isRegular( otherMap[succ->birth] ) )  
+                {
+                    ctLeafQ_pushBack(leafQ, succ);
+                } else if (ctComponent_isRegular(succ) 
+                            && ctComponent_isLeaf(otherMap[succ->birth])) 
+                {
+                    ctComponent * osb = otherMap[succ->birth];
+                    ctLeafQ_pushBack(leafQ, osb);
+                }
+        
+                ctComponent_delete(leaf);
+            }
+        }
     }
+
+    ctx->joinRoot = 0;
+    ctx->splitRoot = 0;
+    ctComponent_delete( plusInf );
+    ctComponent_delete( minusInf );
+    ctLeafQ_delete( leafQ );
+
+    free( ctx->joinComps );
+    free( ctx->splitComps );
+    ctx->joinComps = 0;
+    ctx->splitComps = 0;
+    
+    return arc;
 }
+}
+    
+
     
 ctBranch * 
 ct_decompose( ctContext * ctx )
 {
-    ct_checkContext(ctx);
-    if ( ctx->arcMap == 0 ) {
-        fprintf(stderr,"ct_decompose : ct_decompose was called after ct_arcMap.");
-        return 0;
-    }
-    
-    {
-        ctPriorityQ * pq = ctPriorityQ_new();
-        ctBranch * root = 0;
-    
-        { /* init priority q with the leaves */
-            size_t i;
-            for ( i = 0; i < ctx->numVerts; i++)
-                if ( ctx->nodeMap[i] && ctNode_isLeaf( ctx->nodeMap[i] ) )
-                    ctPriorityQ_push( pq, ctx->nodeMap[i], ctx );
-        }
-    
-        while( 1 ) {
-            ctNode * n = ctPriorityQ_pop(pq,ctx);
-            
-            if (ctNode_isLeaf(n) && ctNode_isLeaf(ctNode_otherNode(n))) { /* all done */
-                
-                root = ctBranch_new( ctNode_leafArc(n)->hi->i, ctNode_leafArc(n)->lo->i, ctx );
-                root->children = ctNode_leafArc(n)->children;
-                ctNode_leafArc(n)->branch = root;
-                {
-                    ctBranch * bc;
-                    for (bc = root->children.head; bc != NULL; bc = bc->nextChild)
-                        bc->parent = root;
-                }
-                
-                break; /* exit */
-            }
-    
-            {
-                ctBranch * b = 0;
-                ctNode * o = 0;
-                int prunedMax = 0;
-        
-                if (ctNode_isMax(n)) {
-                    if ( ctNode_leafArc(n)->nextUp == NULL && ctNode_leafArc(n)->prevUp == NULL) {
-                        continue;
-                    }
-                    b = ctBranch_new( n->i, ctNode_otherNode(n)->i, ctx );
-                    prunedMax = TRUE;
-                } else if (ctNode_isMin(n)) {
-                    if (ctNode_leafArc(n)->nextDown == NULL && ctNode_leafArc(n)->prevDown == NULL) {
-                        continue;
-                    }
-                    b = ctBranch_new(n->i,ctNode_otherNode(n)->i, ctx);
-                    prunedMax = FALSE;
-                } else {
-                    fprintf(stderr, "decompose() : arc was neither max nor min\n");
-                }
-        
-                b->children = ctNode_leafArc(n)->children;
-                ctNode_leafArc(n)->branch = b;
-                {
-                    ctBranch * bc;
-                    for (bc = ctNode_leafArc(n)->children.head; bc != NULL; bc = bc->nextChild)
-                        bc->parent = b;
-                }
-        
-                o = ctNode_prune(n);
-                ctBranchList_add(&(o->children),b, ctx);
-        
-                if (ctNode_isRegular(o)) {
-                    ctArc * a = ctNode_collapse(o, ctx); /* lists get merged in here */
-                    if (prunedMax) {
-                        if (ctNode_isMin(a->lo)) ctPriorityQ_push(pq,a->lo,ctx);
-                    } else {
-                        if (ctNode_isMax(a->hi)) ctPriorityQ_push(pq,a->hi,ctx);
-                    }
-                }
-            }
-        }
-    
-        { /* create branch map */
-            size_t i;
-            /* ctx->branchMap = (ctBranch**) (ctx->joinComps);*/
-            /* reuse this memory */
-            for ( i = 0; i < ctx->numVerts; i++) {
-                ctArc * a = ctx->arcMap[i];
-                assert(a);
-                ctx->branchMap[i] = ctArc_find(a)->branch;
-            }
-        }
-        
-        ctPriorityQ_delete(pq);
-        
-        free( ctx->arcMap );
-        ctx->arcMap = 0;
-        
-        return root;
-    }
+ct_checkContext(ctx);
+if ( ctx->arcMap == 0 ) {
+    fprintf(stderr,"ct_decompose : ct_decompose was called after ct_arcMap.");
+    return 0;
 }
+
+{
+    ctPriorityQ * pq = ctPriorityQ_new();
+    ctBranch * root = 0;
+
+    { /* init priority q with the leaves */
+        size_t i;
+        for ( i = 0; i < ctx->numVerts; i++)
+            if ( ctx->nodeMap[i] && ctNode_isLeaf( ctx->nodeMap[i] ) )
+                ctPriorityQ_push( pq, ctx->nodeMap[i], ctx );
+    }
+
+    while( 1 ) {
+        ctNode * n = ctPriorityQ_pop(pq,ctx);
+        
+        if (ctNode_isLeaf(n) && ctNode_isLeaf(ctNode_otherNode(n))) { /* all done */
+            
+            root = ctBranch_new( ctNode_leafArc(n)->hi->i, ctNode_leafArc(n)->lo->i, ctx );
+            root->children = ctNode_leafArc(n)->children;
+            ctNode_leafArc(n)->branch = root;
+            {
+                ctBranch * bc;
+                for (bc = root->children.head; bc != NULL; bc = bc->nextChild)
+                    bc->parent = root;
+            }
+            
+            break; /* exit */
+        }
+
+        {
+            ctBranch * b = 0;
+            ctNode * o = 0;
+            int prunedMax = 0;
+    
+            if (ctNode_isMax(n)) {
+                if ( ctNode_leafArc(n)->nextUp == NULL && ctNode_leafArc(n)->prevUp == NULL) {
+                    continue;
+                }
+                b = ctBranch_new( n->i, ctNode_otherNode(n)->i, ctx );
+                prunedMax = TRUE;
+            } else if (ctNode_isMin(n)) {
+                if (ctNode_leafArc(n)->nextDown == NULL && ctNode_leafArc(n)->prevDown == NULL) {
+                    continue;
+                }
+                b = ctBranch_new(n->i,ctNode_otherNode(n)->i, ctx);
+                prunedMax = FALSE;
+            } else {
+                fprintf(stderr, "decompose() : arc was neither max nor min\n");
+            }
+    
+            b->children = ctNode_leafArc(n)->children;
+            ctNode_leafArc(n)->branch = b;
+            {
+                ctBranch * bc;
+                for (bc=ctNode_leafArc(n)->children.head; bc!=NULL; bc=bc->nextChild)
+                    bc->parent = b;
+            }
+    
+            o = ctNode_prune(n);
+            ctBranchList_add(&(o->children),b, ctx);
+    
+            if (ctNode_isRegular(o)) {
+                ctArc * a = ctNode_collapse(o, ctx); /* lists get merged in here */
+                if (prunedMax) {
+                    if (ctNode_isMin(a->lo)) ctPriorityQ_push(pq,a->lo,ctx);
+                } else {
+                    if (ctNode_isMax(a->hi)) ctPriorityQ_push(pq,a->hi,ctx);
+                }
+            }
+        }
+    }
+
+    { /* create branch map */
+        size_t i;
+        ctx->branchMap = (ctBranch**) calloc( ctx->numVerts, sizeof(ctBranch*) );
+        memset( (void*)ctx->branchMap, 0, sizeof(ctBranch*)*ctx->numVerts );
+        for ( i = 0; i < ctx->numVerts; i++) {
+            ctArc * a = ctx->arcMap[i];
+            assert(a);
+            ctx->branchMap[i] = ctArc_find(a)->branch;
+        }
+    }
+
+    
+    
+    ctPriorityQ_delete(pq);
+    free( ctx->arcMap );
+    ctx->arcMap = 0;
+    
+    return root;
+}
+}
+
 
 
 static
@@ -632,6 +652,10 @@ ctArc **
 ct_arcMap(ctContext * ctx)
 {
     ctArc ** map = ctx->arcMap;
+    if ( map == 0 ) {
+        fprintf(stderr,"ct_arcMap : ct_arcMap was called after ct_decompose.");
+        return 0;
+    }
     ctx->arcMap = 0;
     return map;
 }
@@ -657,23 +681,41 @@ void ct_branchFree( ctBranch* branch, void* data ) { free(branch); }
 
     
 
-void ct_arcAllocator( ctContext * ctx, ctArc* (*allocArc)(void*), void (*freeArc)( ctArc*, void*) ) 
+void 
+ct_arcAllocator
+(   ctContext * ctx, 
+    ctArc* (*allocArc)(void*), 
+    void (*freeArc)( ctArc*, void*) ) 
 {
     ctx->arcAlloc = allocArc;
     ctx->arcFree = freeArc;
 }
 
-void ct_nodeAllocator( ctContext * ctx, ctNode* (*allocNode)(void*) , void (*freeNode)( ctNode*, void*) ) 
+void 
+ct_nodeAllocator
+(   ctContext * ctx, 
+    ctNode* (*allocNode)(void*) , 
+    void (*freeNode)( ctNode*, void*) ) 
 {
     ctx->nodeAlloc = allocNode;
     ctx->nodeFree = freeNode;
 }
 
-void ct_branchAllocator( ctContext * ctx, ctBranch* (*allocBranch)(void*), void (*freeBranch)( ctBranch*, void*) ) 
+void 
+ct_branchAllocator
+(   ctContext * ctx, 
+    ctBranch* (*allocBranch)(void*), 
+    void (*freeBranch)( ctBranch*, void*) ) 
 {
     ctx->branchAlloc = allocBranch;
     ctx->branchFree = freeBranch;
 }
+
+
+
+
+
+
 
 
 

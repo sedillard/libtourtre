@@ -130,7 +130,9 @@ print_branch( ctBranch *b, int d, FILE* f)
 {
     fprintf(f,"\n");
     for (int i=0; i<d; ++i) fprintf(f,"    ");
-    fprintf(f,"(%u %u  ",b->extremum,b->saddle);
+    size_t nchildren=0;
+    for (ctBranch *c = b->children.head; c; c=c->nextChild) ++nchildren;
+    fprintf(f,"(%u %u %u  ",b->extremum,b->saddle,nchildren);
     for (ctBranch *c = b->children.head; c; c=c->nextChild) 
         print_branch(c,(d+1),f);
     fprintf(f,")");
@@ -159,11 +161,8 @@ compute_contour_tree
     size_t data_size[3],
     FILE *out )
 {
-    printf("sizes are %d,%d,%d\n",data_size[0],data_size[1],data_size[2]);
-
     size_t num_verts, *sorted_verts;
 
-    printf("creating trilinear graph\n");
     TrilinearGraph* graph = 
         tl_create_trilinear_graph( data_size, data, &num_verts, &sorted_verts);
     
@@ -171,7 +170,6 @@ compute_contour_tree
 
     ctContext *ct = ct_init( num_verts, sorted_verts, value, neighbors, (void*)(&wd) ); 
 
-    printf("sweep and merge\n");
     ct_sweepAndMerge(ct);
     ctBranch *root = ct_decompose(ct); 
     
