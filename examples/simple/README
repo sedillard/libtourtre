@@ -23,6 +23,3 @@ branches, 20 to 30 and 100 to 200.
 Look in main.cpp to see how to use libtourtre. The other files 
 (Data.cpp, Mesh.cpp) just read the data and define a tetrahedral mesh.
 
-
-
-

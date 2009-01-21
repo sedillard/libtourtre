@@ -267,8 +267,8 @@ ctBranch ** ct_branchMap( ctContext * ctx );
 
     \section Download
     
-    The latest version is v10. Download it 
-    \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v10.tar.gz">here</a>. \endhtmlonly 
+    The latest version is v11. Download it 
+    \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v11.tar.gz">here</a>. \endhtmlonly 
 
     There is an API change from v8 (which is still available 
     \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v8.tar.gz">here</a>. \endhtmlonly 

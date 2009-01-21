@@ -27,9 +27,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <assert.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include <tourtre.h>
 #include <ctBranch.h>
@@ -83,7 +85,7 @@ fprintf(f,"\
 # saddles : saddle_rec '\\n' <saddles>\n\
 #         | ''\n\
 # \n\
-# saddle_rec : <id> <after> <type> <corner> <loc_x> <loc_y> <loc_z> <value>\n\
+# saddle_rec : id after type corner loc_x loc_y loc_z value\n\
 # \n\
 # id: Integer. The vertex id used to identify the saddle. These are numbered\n\
 #     continguosly starting from the offset of the last voxel.\n\
@@ -155,34 +157,56 @@ print_saddles( TrilinearGraph *g, size_t nverts, size_t nsaddles, size_t order[]
 }
 
 
-void 
-compute_contour_tree
-(   uint8_t *data,
-    size_t data_size[3],
-    FILE *out )
+
+
+
+
+/* 
+ * binary output 
+ * 
+ * the format is identical to the ascii output, except that integers and floats
+ * are stored directly, as 32bit quantities.
+ *
+ */
+
+void
+print_branch_binary( ctBranch *b, int d, FILE* f)
 {
-    size_t num_verts, *sorted_verts;
+    size_t nchildren=0;
+    for (ctBranch *c = b->children.head; c; c=c->nextChild) ++nchildren;
+    int32_t out[3];
+    out[0] = b->extremum;
+    out[1] = b->saddle;
+    out[2] = nchildren;
+    fwrite(out,sizeof(int32_t),3,f);
+    for (ctBranch *c = b->children.head; c; c=c->nextChild) {
+        print_branch_binary(c,(d+1),f);
+    }
+}
 
-    TrilinearGraph* graph = 
-        tl_create_trilinear_graph( data_size, data, &num_verts, &sorted_verts);
+void
+print_saddles_binary( TrilinearGraph *g, size_t nverts, size_t nsaddles, size_t order[], FILE* f)
+{
+    SaddleInfo info;
     
-    WorkingData wd = { data, {data_size[0],data_size[1],data_size[2]}, graph }; 
+    {   int32_t nsaddles_out = nsaddles;
+        fwrite(&nsaddles_out,sizeof(int32_t),1,f);
+    }
 
-    ctContext *ct = ct_init( num_verts, sorted_verts, value, neighbors, (void*)(&wd) ); 
-
-    ct_sweepAndMerge(ct);
-    ctBranch *root = ct_decompose(ct); 
-    
-    assert(root);
-    print_header_comment(out);
-    print_branch(root,0,out); 
-    fprintf(out,"\n");
-    print_saddles(graph, num_verts,
-        num_verts - data_size[0]*data_size[1]*data_size[2], 
-        sorted_verts, out);
-
-    tl_cleanup(graph); 
-    ct_cleanup(ct);
+    for (size_t i=1; i < nverts; ++i ) { /* can't have saddle as first vertex */
+        if ( tl_get_saddle_info(g, order[i], &info ) ) {
+            int32_t ints[4] = { order[i]
+                              , order[i-1]
+                              , info.type
+                              , info.where };
+            float floats[4] = { info.location[0]
+                              , info.location[1]
+                              , info.location[2] 
+                              , info.value };
+            fwrite(ints,sizeof(int32_t),4,f);
+            fwrite(floats,sizeof(int32_t),4,f);
+        }
+    }
 }
 
 
@@ -190,22 +214,45 @@ static
 void
 print_usage_and_exit()
 {
-printf( "\
+printf( "\n\
 tltree : compute the contour tree of a 3D image with trilinear interpolation\n\
 \n\
-usage: tltree ncols nrows nstacks infile [outfile]\n\
+usage: tltree [options] ncols nrows nstacks infile [outfile]\n\
 \n\
     The first three arguments give the size of the image.  The input file\n\
     should contain the image, stored as a sequence of bytes, one byte per\n\
-    voxel, in normal image order (columns, then rows, then 'stacks' or images.)\n\n"
+    voxel, in normal image order (columns, then rows, then 'stacks' or images.)\
+\n\n\
+    Options:\n\
+        -b : binary output\n\n"
 );
     exit(EXIT_FAILURE);
 }
 
 
 int
-main (int argc, char *argv[]) 
+main (int argc__, char *argv__[]) 
 {
+    bool binary=false;
+   
+    int argc = argc__;
+    char **argv = argv__;
+    {   int opt;
+        while ((opt=getopt(argc__,argv__,"b"))!=-1) {
+            switch(opt) {
+            case 'b':
+                binary=true;
+                --argc;
+                ++argv;
+                break;
+            default :
+                printf("yo!\n");
+                print_usage_and_exit();
+            }
+        }
+    }
+
+    
     if (argc < 5) print_usage_and_exit();
    
     int sizei[3];
@@ -254,10 +301,46 @@ main (int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
     } else {
+        if (binary) {
+            fprintf(stderr,"Surely you don't mean to print binary output to stdout.\n");
+            exit(EXIT_FAILURE);
+        }
         out = stdout; 
     }
 
-    compute_contour_tree( image, sizeu, out );
+    { //compute and output the contour tree
+        size_t num_verts, *sorted_verts;
+
+        TrilinearGraph* graph = 
+            tl_create_trilinear_graph( sizeu, image, &num_verts, &sorted_verts);
+        
+        WorkingData wd = { image, {sizeu[0],sizeu[1],sizeu[2]}, graph }; 
+
+        ctContext *ct = ct_init( num_verts, sorted_verts, value, neighbors, (void*)(&wd) ); 
+
+        ct_sweepAndMerge(ct);
+        ctBranch *root = ct_decompose(ct); 
+        
+        assert(root);
+        if (!binary) {
+            print_header_comment(out);
+            print_branch(root,0,out); 
+            fprintf(out,"\n");
+            print_saddles(graph, num_verts,
+                num_verts - sizeu[0]*sizeu[1]*sizeu[2], 
+                sorted_verts, out);
+        } else {
+            print_branch_binary(root,0,out); 
+            print_saddles_binary(graph, num_verts,
+                num_verts - sizeu[0]*sizeu[1]*sizeu[2], 
+                sorted_verts, out);
+        }
+
+        tl_cleanup(graph); 
+        ct_cleanup(ct);
+    } 
+    
+    
     fclose(out); 
 }
 
