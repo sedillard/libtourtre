@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/stat.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <zlib.h>
 
 #include <tourtre.h>
 #include <ctBranch.h>
@@ -61,10 +62,10 @@ neighbors( size_t i, size_t* nbrs, void* wd )
 
 
 void
-print_header_comment (FILE *f )
+print_header_comment (void *f, void (*writer)(void*,const char*,...) )
 {
 
-fprintf(f,"\
+(*writer)(f,"\
 # contour tree file format:\n\
 # \n\
 #     <branches>\n\
@@ -128,27 +129,32 @@ fprintf(f,"\
 }
 
 void
-print_branch( ctBranch *b, int d, FILE* f)
+print_branch( ctBranch *b, int d, void* file, void (*writer)(void*,const char*,...) )
 {
-    fprintf(f,"\n");
-    for (int i=0; i<d; ++i) fprintf(f,"    ");
+    (*writer)(file,"\n");
+    for (int i=0; i<d; ++i) (*writer)(file,"    ");
     size_t nchildren=0;
     for (ctBranch *c = b->children.head; c; c=c->nextChild) ++nchildren;
-    fprintf(f,"(%u %u %u  ",b->extremum,b->saddle,nchildren);
+    (*writer)(file,"(%u %u %u  ",b->extremum,b->saddle,nchildren);
     for (ctBranch *c = b->children.head; c; c=c->nextChild) 
-        print_branch(c,(d+1),f);
-    fprintf(f,")");
+        print_branch(c,(d+1),file,writer);
+    (*writer)(file,")");
 }
 
 void
-print_saddles( TrilinearGraph *g, size_t nverts, size_t nsaddles, size_t order[], FILE* f)
+print_saddles
+(   TrilinearGraph *g, 
+    size_t nverts, 
+    size_t nsaddles, 
+    size_t order[], 
+    void *file,
+    void (*writer)(void*,const char*,...) )
 {
-    
     SaddleInfo info;
-    fprintf(f,"saddles %u\n", nsaddles);
+    (*writer)(file,"saddles %u\n", nsaddles);
     for (size_t i=1; i < nverts; ++i ) { /* can't have saddle as first vertex */
         if ( tl_get_saddle_info(g, order[i], &info ) ) {
-            fprintf(f,"%u %u %d %u %lf %lf %lf %lf\n", 
+            (*writer)(file,"%u %u %d %u %lf %lf %lf %lf\n", 
                 order[i], order[i-1], info.type, info.where, 
                 info.location[0], info.location[1], info.location[2],
                 info.value );
@@ -170,7 +176,11 @@ print_saddles( TrilinearGraph *g, size_t nverts, size_t nsaddles, size_t order[]
  */
 
 void
-print_branch_binary( ctBranch *b, int d, FILE* f)
+print_branch_binary
+(   ctBranch *b, 
+    int d, 
+    void* file, 
+    void (*writer)(void*,void*,size_t) )
 {
     size_t nchildren=0;
     for (ctBranch *c = b->children.head; c; c=c->nextChild) ++nchildren;
@@ -178,19 +188,25 @@ print_branch_binary( ctBranch *b, int d, FILE* f)
     out[0] = b->extremum;
     out[1] = b->saddle;
     out[2] = nchildren;
-    fwrite(out,sizeof(int32_t),3,f);
+    (*writer)(file,out,sizeof(int32_t)*3);
     for (ctBranch *c = b->children.head; c; c=c->nextChild) {
-        print_branch_binary(c,(d+1),f);
+        print_branch_binary(c,(d+1),file,writer);
     }
 }
 
 void
-print_saddles_binary( TrilinearGraph *g, size_t nverts, size_t nsaddles, size_t order[], FILE* f)
+print_saddles_binary
+(   TrilinearGraph *g, 
+    size_t nverts, 
+    size_t nsaddles, 
+    size_t order[], 
+    void* file, 
+    void (*writer)(void*,void*,size_t))
 {
     SaddleInfo info;
     
     {   int32_t nsaddles_out = nsaddles;
-        fwrite(&nsaddles_out,sizeof(int32_t),1,f);
+        (*writer)(file,&nsaddles_out,sizeof(int32_t));
     }
 
     for (size_t i=1; i < nverts; ++i ) { /* can't have saddle as first vertex */
@@ -203,8 +219,8 @@ print_saddles_binary( TrilinearGraph *g, size_t nverts, size_t nsaddles, size_t 
                               , info.location[1]
                               , info.location[2] 
                               , info.value };
-            fwrite(ints,sizeof(int32_t),4,f);
-            fwrite(floats,sizeof(int32_t),4,f);
+            (*writer)(file,ints,sizeof(int32_t)*4);
+            (*writer)(file,floats,sizeof(int32_t)*4);
         }
     }
 }
@@ -224,35 +240,47 @@ usage: tltree [options] ncols nrows nstacks infile [outfile]\n\
     voxel, in normal image order (columns, then rows, then 'stacks' or images.)\
 \n\n\
     Options:\n\
-        -b : binary output\n\n"
+        -z : gzipped output\n\n\
+        -b : binary output (default is ascii)\n\n"
 );
     exit(EXIT_FAILURE);
 }
+
+
+//need to slightly re-arrange fwrite arguments to match gzwrite
+int
+fwrite_ ( FILE *f, void *d, size_t s )
+{ return fwrite(d,s,1,f); }
+
 
 
 int
 main (int argc__, char *argv__[]) 
 {
     bool binary=false;
+    bool zipped=false;
    
     int argc = argc__;
     char **argv = argv__;
     {   int opt;
-        while ((opt=getopt(argc__,argv__,"b"))!=-1) {
+        while ((opt=getopt(argc__,argv__,"zb"))!=-1) {
             switch(opt) {
+            case 'z':
+                zipped=true;
+                --argc;
+                ++argv;
+                break;
             case 'b':
                 binary=true;
                 --argc;
                 ++argv;
                 break;
             default :
-                printf("yo!\n");
                 print_usage_and_exit();
             }
         }
     }
 
-    
     if (argc < 5) print_usage_and_exit();
    
     int sizei[3];
@@ -293,16 +321,27 @@ main (int argc__, char *argv__[])
     fclose(in);
 
 
-    FILE *out = 0;
+    void *out = 0;
     if ( argc > 5 ) {
-        out = fopen(argv[5],"w");
+        if (zipped) {
+            if (binary) 
+                out = gzopen(argv[5],"wb");
+            else 
+                out = gzopen(argv[5],"w");
+        } else {
+            if (binary)
+                out = fopen(argv[5],"wb");
+            else 
+                out = fopen(argv[5],"w");
+        }
+
         if (!out) {
             fprintf(stderr,"Couldn't open file %s for writing.\n",argv[4]);
             exit(EXIT_FAILURE);
         }
     } else {
-        if (binary) {
-            fprintf(stderr,"Surely you don't mean to print binary output to stdout.\n");
+        if (binary || zipped) {
+            fprintf(stderr,"Surely you don't mean to print binary/compressed output to stdout.\n");
             exit(EXIT_FAILURE);
         }
         out = stdout; 
@@ -323,25 +362,36 @@ main (int argc__, char *argv__[])
         
         assert(root);
         if (!binary) {
-            print_header_comment(out);
-            print_branch(root,0,out); 
-            fprintf(out,"\n");
+            void *writer; 
+            //types of gzprintf and fprintf really are compatible
+            //the compiler just doesn't realize it.
+            if (zipped) writer = gzprintf;
+            else writer = fprintf;
+            
+            print_header_comment(out,writer);
+            print_branch(root,0,out,writer); 
+            (*((void (*)(void*,const char*,...))writer))(out,"\n");
             print_saddles(graph, num_verts,
                 num_verts - sizeu[0]*sizeu[1]*sizeu[2], 
-                sorted_verts, out);
+                sorted_verts, out,writer);
+            
         } else {
-            print_branch_binary(root,0,out); 
+            void *writer;
+            if (zipped) writer = gzwrite;
+            else writer = fwrite_;
+            
+            print_branch_binary(root,0,out,writer); 
             print_saddles_binary(graph, num_verts,
                 num_verts - sizeu[0]*sizeu[1]*sizeu[2], 
-                sorted_verts, out);
+                sorted_verts, out,writer);
         }
 
         tl_cleanup(graph); 
         ct_cleanup(ct);
     } 
     
-    
-    fclose(out); 
+    if ( zipped ) gzclose(out);
+    else fclose(out);
 }
 
 
