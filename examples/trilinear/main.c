@@ -42,7 +42,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef
 struct WorkingData_ {
   Values data;
-  int data_size[3];
   TrilinearGraph *graph;
 } WorkingData;
 
@@ -353,15 +352,16 @@ main (int argc__, char *argv__[])
         TrilinearGraph* graph = 
             tl_create_trilinear_graph( sizeu, image, &num_verts, &sorted_verts);
         
-        WorkingData wd = { image, {sizeu[0],sizeu[1],sizeu[2]}, graph }; 
+        WorkingData wd = { image, graph }; 
 
         ctContext *ct = ct_init( num_verts, sorted_verts, value, neighbors, (void*)(&wd) ); 
 
-        ctArc *orig = ct_sweepAndMerge(ct);
+        //ctArc *orig = 
+           ct_sweepAndMerge(ct);
 
         //test ct_copyTree and ct_deleteTree
-        ctArc *copy = ct_copyTree( orig,0,ct );
-        ct_deleteTree(copy,ct);
+        //ctArc *copy = ct_copyTree( orig,0,ct );
+        //ct_deleteTree(copy,ct);
         
         ctBranch *root = ct_decompose(ct); 
         
@@ -391,6 +391,7 @@ main (int argc__, char *argv__[])
                 sorted_verts, out,writer);
         }
 
+        ctBranch_delete(root,ct);    
         tl_cleanup(graph); 
         ct_cleanup(ct);
     } 

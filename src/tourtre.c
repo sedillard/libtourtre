@@ -222,7 +222,6 @@ ct_checkContext(ctx);
                         comps[i] = iComp;
                         next[iComp->last] = i;
                     } else if (numNbrComps == 1) {
-                        
                         /* create new component */
                         ctComponent * newComp = ctComponent_new(type); 
                         newComp->birth = i;
