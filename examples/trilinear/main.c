@@ -357,7 +357,12 @@ main (int argc__, char *argv__[])
 
         ctContext *ct = ct_init( num_verts, sorted_verts, value, neighbors, (void*)(&wd) ); 
 
-        ct_sweepAndMerge(ct);
+        ctArc *orig = ct_sweepAndMerge(ct);
+
+        //test ct_copyTree and ct_deleteTree
+        ctArc *copy = ct_copyTree( orig,0,ct );
+        ct_deleteTree(copy,ct);
+        
         ctBranch *root = ct_decompose(ct); 
         
         assert(root);

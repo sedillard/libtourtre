@@ -70,7 +70,7 @@ struct ctContext
      * OPTIONAL -- This is passed as the final argument to all callbacks. Use
      * this for reentrant code. 
      **/
-    void * data; /* last arg to all callbacks */
+    void * cbData; /* last arg to all callbacks */
     
     
     ctArc* (*arcAlloc)(void*);
@@ -91,9 +91,12 @@ struct ctContext
     ctComponent **joinComps, **splitComps;
     size_t *nextJoin, *nextSplit;
     ctArc ** arcMap;
-    ctBranch ** branchMap;
+    int arcMapOwned; /* does the library still own arcMap? */
+    ctBranch ** branchMap; 
+    int branchMapOwned; /* does the library still own branchMap */
     ctNodeMap *nodeMap;
 
+    ctArc *tree; 
 };
 
  

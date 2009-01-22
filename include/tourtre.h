@@ -93,24 +93,24 @@ ctContext * ct_init(
 void ct_maxValence( ctContext * ctx, size_t max ); 
 
 /** 
- * Process a vertex in the sweepAndMerge algorithm. This is called when the arc
- * belonging to v is added to the contour tree. One use for this might be to
- * estimate the area/volume of an arc.  If your vertices are evenly spaced, then
- * you can keep an accumulator in ctArc.data and add to it using this function.
- * This function may not be called for every arc, but when it is called, you can
- * use the vertex v as a <a
- * href="http://citeseer.ist.psu.edu/bajaj98contour.html">path seed</a> for arc a.
- * It will be called many times for the "big, important arcs." 
+ * Process a vertex in the sweepAndMerge algorithm. This is called when the
+ * arc belonging to v is added to the contour tree. One use for this might be
+ * to estimate the area/volume of an arc.  If your vertices are evenly spaced,
+ * then you can keep an accumulator in ctArc.data and add to it using this
+ * function.  This function may not be called for every arc, but when it is
+ * called, you can use the vertex v as a <a
+ * href="http://citeseer.ist.psu.edu/bajaj98contour.html">path seed</a> for
+ * arc a.  It will be called many times for the "big, important arcs." 
  **/  
 void ct_vertexFunc( ctContext * ctx, void (*vertexFunc)( size_t v, ctArc* a, void* ) );
 
 
 /** 
  * This is called when two arcs are merged by simplification. If you are
- * keeping track of arc properties using
- * ct_vertexFunc, then you will want to sum up those properties using this
- * function. The first argument is the arc which will remain after the merge,
- * the second argument is the one which will be deleted. 
+ * keeping track of arc properties using ct_vertexFunc, then you will want to
+ * sum up those properties using this function. The first argument is the arc
+ * which will remain after the merge, the second argument is the one which
+ * will be deleted. 
  **/
 void ct_arcMergeFunc( ctContext * ctx, void (*arcMergeFunc)( ctArc* a, ctArc* b, void* ) );
 
@@ -118,10 +118,9 @@ void ct_arcMergeFunc( ctContext * ctx, void (*arcMergeFunc)( ctArc* a, ctArc* b,
 
 /** 
  * Define the simplification priority of an arc. The function is passed a leaf
- * node. Use ctNode_leafArc() to
- * access the leaf arc. Arcs with smaller priority are pruned first. For
- * example, you might use the arc area/volume directly as a simplification
- * priority. 
+ * node. Use ctNode_leafArc() to access the leaf arc. Arcs with smaller
+ * priority are pruned first. For example, you might use the arc area/volume
+ * directly as a simplification priority. 
  **/
 void ct_priorityFunc( ctContext * ctx, double (*priorityFunc)( ctNode*, void* ) );
 
@@ -150,16 +149,44 @@ void ct_branchAllocator( ctContext * ctx, ctBranch* (*allocBranch)(void*), void 
         
 /** 
  * Perform the sweep and merge algorithm. This will take a while. Returns some
- * arc of the contour tree.
+ * arc of the contour tree. The constructed tree is owned by the library, and 
+ * will be deleted when ct_cleanup is called. If you want your own tree, use
+ * ct_copyTree.
  **/
 ctArc* ct_sweepAndMerge( ctContext * ctx );
 
 
+/**
+ * Perform just the join sweep. The point of calling this would be to
+ * also call the split sweep in another thread; they can be performed
+ * concurrently. After both are done, call ct_mergeTrees to get the
+ * final contour tree
+ **/
+
+void ct_joinSweep( ctContext * ctx );
+
+/**
+ * Perform just the split sweep. The point of calling this would be to
+ * also call the join sweep in another thread; they can be performed
+ * concurrently. After both are done, call ct_mergeTrees to get the
+ * final contour tree
+ **/
+
+void ct_splitSweep( ctContext * ctx );
+
+/**
+ * Call this after ct_joinSweep and ct_splitSweep are finished. It
+ * will return an arc of the contour tree, same as ct_sweepAndMerge
+ **/
+
+ctArc * ct_mergeTrees( ctContext * ctx );
 
 /** 
- * Perform the branch decomposition. This is pretty quick. This deletes the
- * contour tree, so don't call ct_arcMap after calling ct_decompose. Returns
- * the root branch. 
+ * Perform the branch decomposition.  Returns the root branch.  This consumes
+ * the contour tree, so don't access the contour tree or use ct_arcMap after
+ * calling ct_decompose. If you need to keep the contour tree around, use
+ * ct_copyTree to make a copy of it. The branch-decomposition tree that is
+ * returned is YOURS. The library does not free it when ct_cleanup is called.
  **/   
 ctBranch*  ct_decompose ( ctContext * ctx );
 
@@ -173,11 +200,11 @@ void  ct_cleanup ( ctContext * ctx );
 /** 
  * Retreive the vertex-to-arc mapping. Returns an array of size equal to
  * ctContext.numVerts, where element i points to the arc which contains vertex
- * i. If i is a critical point, the map will point to one of the attached arcs.
- * IMPORTANT -- ownership of the array is passed to the calling environment. It
- * is your responsibility to free() this. This allows to you call ct_cleanup
- * and still use your arc map. If you call ct_cleanup before calling ct_arcMap,
- * the library will free the arc map memory and ct_arcMap will return null. 
+ * i. If i is a critical point, the map will point to one of the attached
+ * arcs.  Ownership of the array is passed to the calling environment, HOWEVER
+ * the array must not be freed or modified if you want to call ct_decompose.
+ * Note that after ct_cleanup is called, the arcs that this map originally
+ * points to are freed, so you should copy them with ct_copyTree.
  **/
 ctArc ** ct_arcMap( ctContext * ctx );
 
@@ -186,26 +213,63 @@ ctArc ** ct_arcMap( ctContext * ctx );
  * Retreive the vertex-to-branch mapping. Returns an array of size equal to
  * ctContext.numVerts, where element i points to the branch which contains
  * vertex i. If i is a saddle point, the map will point to the parent branch.
- * IMPORTANT -- This function needs the arc map to do its thing. Don' call
- * ct_arcMap before calling ct_branchMap (or after, for that matter.) Ownership
- * of the array is passed to the calling environment. It is your responsibility
- * to free() this. This allows to you call ct_cleanup and still use your branch
- * map. If you call ct_cleanup before calling ct_branchMap, the library will
- * free the branch map memory and ct_branchMap will return null
+ * IMPORTANT -- This function needs the arc map to do its thing. Don't modify
+ * or free the result of ct_arcMap before calling ct_branchMap.  Ownership of
+ * the array is passed to the calling environment. It is your responsibility
+ * to free() this. This allows to you call ct_cleanup and still use your
+ * branch map. 
  **/
 ctBranch ** ct_branchMap( ctContext * ctx );
 
 
 
 
+/**
+ * Constructs a new tree which is a copy of src. If moveData is true,
+ * The 'data' fields of the arcs and nodes of the new tree will be copied
+ * from those of the old tree, while those fields in the old tree will
+ * be modified to point to the corresponding arc/node of the new tree.
+ * So the data fields are really 'moved' from the old tree to the new,
+ * not just copied. But you can still access the data from the old tree
+ * because those fields point to the new tree.
+ *
+ * This is not an ideal behavior; it would be nice to make a proper copy of
+ * the data fields. The issue is that I don't yet have an efficient way to
+ * make a copy the arcMap, so that it can be used to look up arcs in the new
+ * tree.  Using this (lame, hackish) method, you can do the following:
+ * 
+ * \code 
+ * ctArc *newTree = ct_copyTree(oldTree,TRUE,ctx);
+ * ctArc **newArcMap = malloc( numVerts * sizeof(ctArc*) );
+ * ctArc **oldArcMap = ct_arcMap(ctx);
+ * for (size_t i=0; i<numVerts; ++i) 
+ *   newArcMap[i] = oldArcMap[i]->data;
+ * \endcode
+ *
+ * Then you can copy the data fields back to the old tree if you need them for
+ * ct_decompose.
+ **/
+ctArc* ct_copyTree( ctArc *src, int moveData, ctContext *ctx );
 
-#endif
 	
+/**
+ * Fetch all the arcs and nodes in a tree. They are returned in arrays
+ * arcsOut and nodesOut, which you must free. These are arrays of 
+ * ctArc and ctNode pointers, which are returned by reference, hence the ***
+ * silliness.
+ **/
+
+void ct_arcsAndNodes( ctArc *a, 
+                      ctArc ***arcsOut,  size_t *numArcsOut, 
+                      ctNode ***nodesOut, size_t *numNodesOut );
 
 
-
-
-
+/** 
+ * Delete a contour tree that you obtained from ct_copyTree. DON'T delete
+ * the original tree obtained from ct_sweepAndMerge or ct_mergeTrees; That
+ * one belongs to the library and will be freed by ct_cleaup
+ **/
+void ct_deleteTree( ctArc *a, ctContext *ctx );
 
 
 
@@ -278,3 +342,6 @@ ctBranch ** ct_branchMap( ctContext * ctx );
     just do something stupid like "assert(false);" I will add some nice error
     message facility in the future. 
 */
+
+#endif
+

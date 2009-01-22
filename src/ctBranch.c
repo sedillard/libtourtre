@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ctBranch * ctBranch_new( size_t e, size_t s, ctContext * ctx )
 {
-	ctBranch * b = (*(ctx->branchAlloc))(ctx->data);
+	ctBranch * b = (*(ctx->branchAlloc))(ctx->cbData);
 	b->extremum = e;
 	b->saddle = s;
 	b->parent = NULL;
@@ -47,7 +47,7 @@ void ctBranch_delete( ctBranch * self, ctContext * ctx )
 	for ( c = self->children.head; c != NULL; c = c->nextChild ) {
 		ctBranch_delete( c, ctx );
 	}
-	(*(ctx->branchFree))(self,ctx->data);
+	(*(ctx->branchFree))(self,ctx->cbData);
 }
 
 ctBranchList ctBranchList_init()
@@ -60,7 +60,7 @@ ctBranchList ctBranchList_init()
 static int 
 compareSaddles(size_t a, size_t b, ctContext * ctx)
 {
-    return (*(ctx->value))(a,ctx->data) < (*(ctx->value))(b,ctx->data);
+    return (*(ctx->value))(a,ctx->cbData) < (*(ctx->value))(b,ctx->cbData);
 }
 
 void ctBranchList_add(ctBranchList * self, ctBranch * c, ctContext * ctx)

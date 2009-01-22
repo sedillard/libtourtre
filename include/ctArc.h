@@ -79,23 +79,31 @@ typedef struct ctArc
 	/** User data */
 	void * data; /* user data */
 	
-	/** Branch that this arc becomes after decomposition. Only valid after ct_decompose is called. */
+        /** 
+         * Branch that this arc becomes after decomposition. Only valid after
+         * ct_decompose is called. */
 	ctBranch * branch; 
 	
-	/** Temporary storage for branches that will be children of this arc/branch. Don't use. Access through ctBranch instead.  */
+        /** 
+         * Temporary storage for branches that will be children of this
+         * arc/branch. Don't use. Access through ctBranch instead.  */
 	ctBranchList children;
 	
-	/** Union-find pointer. Don't use. */
+	/** Union-find pointer. Don't touch. */
 	struct ctArc * uf;
 	
 
 } ctArc;	
 
 
-/** Allocate a new ctArc, that spans nodes h and l. The node is allocated using the allocator specified by \ref ct_arcAllocator */
+/** 
+ * Allocate a new ctArc, that spans nodes h and l. The node is allocated
+ * using the allocator specified by \ref ct_arcAllocator */
 ctArc*  ctArc_new    ( struct ctNode * h, struct ctNode * l, struct ctContext * ctx );
 
-/** Delete a ctArc structure using the deallocator specified by \ref ct_arcAllocator*/
+/** 
+ * Delete a ctArc structure using the deallocator specified by \ref
+ * ct_arcAllocator*/
 void  ctArc_delete ( ctArc * self, struct ctContext * ctx );
 
 /** Union-find find */

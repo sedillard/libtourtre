@@ -97,7 +97,7 @@ ctNode*  ctNode_new           ( size_t i, struct ctContext* ctx );
  ctArc*  ctNode_leafArc       ( ctNode* self );
 
 /** If this node is a leaf, this will retrieve the node at the other end of the arc */
-ctNode*  ctNode_otherNode     ( );
+ctNode*  ctNode_otherNode     ( ctNode* self );
 
 /** Add an arc to the list of upward arcs */
    void  ctNode_addUpArc      ( ctNode* self, ctArc * a );

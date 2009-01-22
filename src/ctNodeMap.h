@@ -14,7 +14,8 @@ void ctNodeMap_insert( ctNodeMap **m, size_t index, struct ctNode *node );
 
 void ctNodeMap_delete( ctNodeMap* );
 
-void ctNodeMap_push_leaves( struct ctNodeMap*, struct ctPriorityQ*, struct ctContext* );
+void ctNodeMap_push_leaves( struct ctNodeMap*, struct ctPriorityQ*, 
+                            struct ctContext* );
 
 #endif
 

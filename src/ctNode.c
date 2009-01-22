@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ctNode * ctNode_new(size_t i, ctContext* ctx)
 {
-	ctNode * n = (*(ctx->nodeAlloc))(ctx->data);
+	ctNode * n = (*(ctx->nodeAlloc))(ctx->cbData);
 	n->i = i;
 	n->up = NULL;
 	n->down = NULL;
@@ -41,7 +41,7 @@ ctNode * ctNode_new(size_t i, ctContext* ctx)
 
 void ctNode_delete( ctNode * self, ctContext* ctx ) 
 { 
-	(*(ctx->nodeFree))(self,ctx->data);
+	(*(ctx->nodeFree))(self,ctx->cbData);
 }
 
 int ctNode_isMax( ctNode * self ) { return self->up == NULL; }
@@ -112,7 +112,7 @@ ctArc * ctNode_collapse( ctNode * self, ctContext * ctx )
 	assert( ctNode_isRegular(self) );
 	
 	if (ctx->mergeArcs)
-		(*(ctx->mergeArcs))( self->up, self->down, ctx->data );
+		(*(ctx->mergeArcs))( self->up, self->down, ctx->cbData );
 
 	ctBranchList_merge( &(self->up->children), &(self->down->children), ctx );
 	ctBranchList_merge( &(self->up->children), &(self->children), ctx );

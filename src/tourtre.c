@@ -67,7 +67,7 @@ ct_init
     size_t  *totalOrder, 
     double  (*value)( size_t v, void* ),
     size_t  (*neighbors)( size_t v, size_t* nbrs, void* ),
-     void*  data
+     void*  cbData
 )
 {
     ctContext * ctx = (ctContext*) malloc(sizeof(ctContext));
@@ -91,7 +91,7 @@ ct_init
     ctx->totalOrder = totalOrder;
     ctx->value = value;
     ctx->neighbors = neighbors;
-    ctx->data = data;
+    ctx->cbData = cbData;
     
     /* create working mem */
     ctx->numVerts = numVerts;
@@ -112,8 +112,11 @@ ct_init
     memset(ctx->nextSplit,CT_NIL,sizeof(size_t)*ctx->numVerts );
 
     ctx->arcMap = 0;
+    ctx->arcMapOwned = 1;
     ctx->nodeMap = 0;
+    ctx->branchMapOwned = 1;
     ctx->branchMap = 0;
+    ctx->tree = 0;
     
     return ctx;
 }
@@ -125,30 +128,54 @@ void ct_cleanup( ctContext * ctx )
     if ( ctx->nextJoin   ) free( ctx->nextJoin );
     if ( ctx->nextSplit  ) free( ctx->nextSplit );
     
-    if ( ctx->arcMap != NULL )    free(ctx->arcMap);
-    if ( ctx->branchMap != NULL ) free(ctx->branchMap);
-    if ( ctx->nodeMap != NULL )   ctNodeMap_delete(ctx->nodeMap);
+    if ( ctx->arcMapOwned && ctx->arcMap != NULL ) free(ctx->arcMap);
+    if ( ctx->branchMapOwned && ctx->branchMap != NULL ) free(ctx->branchMap);
+    if ( ctx->nodeMap != NULL ) ctNodeMap_delete(ctx->nodeMap);
+
+    if (ctx->tree) ct_deleteTree(ctx->tree,ctx); 
 }
+
+
+void ct_joinSweep( ctContext * ctx )
+{
+ct_checkContext(ctx);
+{
+    ctx->joinRoot = 
+        ct_sweep( 0,ctx->numVerts,+1,
+            CT_JOIN_COMPONENT, ctx->joinComps, ctx->nextJoin, ctx  );
+}
+}
+
+void ct_splitSweep( ctContext * ctx )
+{
+ct_checkContext(ctx);
+{
+    ctx->splitRoot = 
+        ct_sweep( ctx->numVerts-1,-1,-1, 
+            CT_SPLIT_COMPONENT, ctx->splitComps, ctx->nextSplit, ctx );
+}
+}
+
+ctArc * ct_mergeTrees( ctContext * ctx )
+{
+    assert(ctx->splitRoot && ctx->joinRoot && 
+        "Did you call ct_mergeTrees without first calling \
+        ct_joinSweep and ct_splitSweep?");
+
+    ct_augment( ctx );
+    return ctx->tree=ct_merge( ctx );
+}
+
 
 ctArc * ct_sweepAndMerge( ctContext * ctx )
 {
-    ct_checkContext(ctx);
-    {
-        ctArc * ret;
-       
-        ctx->joinRoot = 
-            ct_sweep( 0,ctx->numVerts,+1,
-                CT_JOIN_COMPONENT, ctx->joinComps, ctx->nextJoin, ctx  );
-
-        ctx->splitRoot = 
-            ct_sweep( ctx->numVerts-1,-1,-1, 
-                CT_SPLIT_COMPONENT, ctx->splitComps, ctx->nextSplit, ctx );
-                
-        ct_augment( ctx );
-        ret = ct_merge( ctx );
-        
-        return ret;
-    }
+ct_checkContext(ctx);
+{
+    ct_joinSweep(ctx);
+    ct_splitSweep(ctx);
+    ct_augment( ctx );
+    return ctx->tree=ct_merge( ctx );
+}
 }
 
 
@@ -180,7 +207,7 @@ ct_checkContext(ctx);
         i = ctx->totalOrder[itr];
         
         iComp = NULL;
-        numNbrs = (*(ctx->neighbors))(i,nbrs,ctx->data);
+        numNbrs = (*(ctx->neighbors))(i,nbrs,ctx->cbData);
         numNbrComps = 0;
         for (n = 0; n < numNbrs; n++) {
             size_t j = nbrs[n];
@@ -506,7 +533,7 @@ ct_checkContext(ctx);
                 for( c = leaf->birth; c != leaf->death; c = next[c] ) {
                     if (arcMap[c] == NULL) {
                         arcMap[c] = arc;
-                        if (ctx->procVertex) (*(ctx->procVertex))( c, arc, ctx->data );
+                        if (ctx->procVertex) (*(ctx->procVertex))( c, arc, ctx->cbData );
                     }
                 }
             }
@@ -579,11 +606,11 @@ if ( ctx->arcMap == 0 ) {
     ctPriorityQ * pq = ctPriorityQ_new();
     ctNodeMap_push_leaves(ctx->nodeMap,pq,ctx);
 
-    while( 1 ) {
+    for(;;) {
         ctNode * n = ctPriorityQ_pop(pq,ctx);
         
-        if (ctNode_isLeaf(n) && ctNode_isLeaf(ctNode_otherNode(n))) { /* all done */
-            
+        if (ctNode_isLeaf(n) && ctNode_isLeaf(ctNode_otherNode(n))) { 
+            /* all done */
             root = ctBranch_new( ctNode_leafArc(n)->hi->i, ctNode_leafArc(n)->lo->i, ctx );
             root->children = ctNode_leafArc(n)->children;
             ctNode_leafArc(n)->branch = root;
@@ -592,44 +619,48 @@ if ( ctx->arcMap == 0 ) {
                 for (bc = root->children.head; bc != NULL; bc = bc->nextChild)
                     bc->parent = root;
             }
-            
             break; /* exit */
         }
-
-        {
-            ctBranch * b = 0;
+        {   ctBranch * b = 0;
             ctNode * o = 0;
             int prunedMax = 0;
     
             if (ctNode_isMax(n)) {
-                if ( ctNode_leafArc(n)->nextUp == NULL && ctNode_leafArc(n)->prevUp == NULL) {
+                if ( ctNode_leafArc(n)->nextUp == NULL && 
+                     ctNode_leafArc(n)->prevUp == NULL ) 
+                {
                     continue;
                 }
                 b = ctBranch_new( n->i, ctNode_otherNode(n)->i, ctx );
                 prunedMax = TRUE;
             } else if (ctNode_isMin(n)) {
-                if (ctNode_leafArc(n)->nextDown == NULL && ctNode_leafArc(n)->prevDown == NULL) {
+                if ( ctNode_leafArc(n)->nextDown == NULL && 
+                     ctNode_leafArc(n)->prevDown == NULL ) 
+                {
                     continue;
                 }
                 b = ctBranch_new(n->i,ctNode_otherNode(n)->i, ctx);
                 prunedMax = FALSE;
             } else {
-                fprintf(stderr, "decompose() : arc was neither max nor min\n");
+                fprintf(stderr,"decompose() : arc was neither max nor min\n");
             }
     
             b->children = ctNode_leafArc(n)->children;
             ctNode_leafArc(n)->branch = b;
             {
                 ctBranch * bc;
-                for (bc=ctNode_leafArc(n)->children.head; bc!=NULL; bc=bc->nextChild)
+                for (bc=ctNode_leafArc(n)->children.head; 
+                     bc!=NULL; bc=bc->nextChild)
+                {
                     bc->parent = b;
+                }
             }
     
             o = ctNode_prune(n);
             ctBranchList_add(&(o->children),b, ctx);
     
             if (ctNode_isRegular(o)) {
-                ctArc * a = ctNode_collapse(o, ctx); /* lists get merged in here */
+                ctArc * a = ctNode_collapse(o, ctx); /*lists get merged here*/
                 if (prunedMax) {
                     if (ctNode_isMin(a->lo)) ctPriorityQ_push(pq,a->lo,ctx);
                 } else {
@@ -639,9 +670,9 @@ if ( ctx->arcMap == 0 ) {
         }
     }
 
-    { /* create branch map */
+    {   /* create branch map */
         size_t i;
-        ctx->branchMap = (ctBranch**) calloc( ctx->numVerts, sizeof(ctBranch*) );
+        ctx->branchMap = (ctBranch**)calloc(ctx->numVerts,sizeof(ctBranch*));
         memset( (void*)ctx->branchMap, 0, sizeof(ctBranch*)*ctx->numVerts );
         for ( i = 0; i < ctx->numVerts; i++) {
             ctArc * a = ctx->arcMap[i];
@@ -649,13 +680,9 @@ if ( ctx->arcMap == 0 ) {
             ctx->branchMap[i] = ctArc_find(a)->branch;
         }
     }
-
-    
     
     ctPriorityQ_delete(pq);
-    free( ctx->arcMap );
-    ctx->arcMap = 0;
-    
+    ctx->tree = 0;
     return root;
 }
 }
@@ -676,32 +703,26 @@ ct_checkContext ( ctContext * ctx )
 ctArc ** 
 ct_arcMap(ctContext * ctx)
 {
-    ctArc ** map = ctx->arcMap;
-    if ( map == 0 ) {
-        fprintf(stderr,"ct_arcMap : ct_arcMap was called after ct_decompose.");
-        return 0;
-    }
-    ctx->arcMap = 0;
-    return map;
+    ctx->arcMapOwned = 0;
+    return ctx->arcMap;
 }
 
 ctBranch ** 
 ct_branchMap( ctContext * ctx )
 {
-    ctBranch ** map = ctx->branchMap;
-    ctx->branchMap = 0;
-    return map;    
+    ctx->branchMapOwned = 0;
+    return ctx->branchMap;
 }
 
 
-ctArc* ct_arcMalloc( void* data ) { return (ctArc*)malloc(sizeof(ctArc)); }
-void ct_arcFree( ctArc* arc, void* data ) { free(arc); }
+ctArc* ct_arcMalloc( void* cbData ) { return (ctArc*)malloc(sizeof(ctArc)); }
+void ct_arcFree( ctArc* arc, void* cbData ) { free(arc); }
 
-ctNode* ct_nodeMalloc( void* data ) { return (ctNode*)malloc(sizeof(ctNode)); }
-void ct_nodeFree( ctNode* node, void* data ) { free(node); }
+ctNode* ct_nodeMalloc( void* cbData ) { return (ctNode*)malloc(sizeof(ctNode)); }
+void ct_nodeFree( ctNode* node, void* cbData ) { free(node); }
 
-ctBranch* ct_branchMalloc( void* data ) { return (ctBranch*)malloc(sizeof(ctBranch)); }
-void ct_branchFree( ctBranch* branch, void* data ) { free(branch); }
+ctBranch* ct_branchMalloc( void* cbData ) { return (ctBranch*)malloc(sizeof(ctBranch)); }
+void ct_branchFree( ctBranch* branch, void* cbData ) { free(branch); }
 
 
     
@@ -740,8 +761,197 @@ ct_branchAllocator
 
 
 
+/* Sorry excuse for a contour tree iterator.
+ */
+typedef struct NodePair 
+{ 
+    ctNode *node; /* The current node */
+    ctNode *prev; /* The node we came from. Don't go back there */
+} NodePair;
 
 
+static
+NodePair* pushNodePair
+(   NodePair **stack, 
+    size_t *stack_size, 
+    size_t *stack_cap )
+{
+    if (*stack_size == *stack_cap) 
+        *stack = (NodePair*) realloc(
+            *stack, sizeof(NodePair) * ( (*stack_cap) *= 2 ) );
+    return (*stack) + (++(*stack_size) - 1);
+}
 
+
+ctArc*
+ct_copyTree( ctArc *src, int moveData, ctContext *ctx )
+{
+    ctNode *start = src->lo;
+    ctNodeMap *nodeMap=0;
+    ctArc *a=0; /* arc iterator in for loops */
+    ctArc *anArc=0; /* will return an arc of the new tree */
+
+    size_t stack_cap = 256, stack_size;
+    NodePair *stack = (NodePair*)malloc(sizeof(NodePair)*stack_cap);
+
+    stack_size=1; 
+    stack[0].node = start;
+    stack[0].prev = 0;
+
+    /* build map form vertex ids to new nodes */
+    while (stack_size>0) {
+        NodePair *np = stack + (--stack_size);
+        ctNode *n = np->node, *p = np->prev;
+        ctNode *newNode = ctNode_new(n->i,ctx);
+
+        assert(!n->up   || n->up->lo == n); 
+        assert(!n->down || n->down->hi == n);
+        ctNodeMap_insert(&nodeMap,n->i,newNode); 
+        if (moveData) {
+            newNode->data=n->data; 
+            n->data=newNode;
+        }
+
+        for (a=n->up; a!=NULL; a=a->nextUp) {
+            if (a->hi != p) {
+                NodePair *top = pushNodePair(&stack,&stack_size,&stack_cap);
+                top->node = a->hi;
+                top->prev = n;
+            }
+        }
+        for (a=n->down; a!=NULL; a=a->nextDown) {
+            if (a->lo != p) {
+                NodePair *top = pushNodePair(&stack,&stack_size,&stack_cap);
+                top->node = a->lo;
+                top->prev = n;
+            }
+        }
+    }
+
+    stack_size=1; 
+    stack[0].node = start;
+    stack[0].prev = 0;
+
+    /* then create new arcs between the new nodes */
+    while (stack_size>0) {
+        NodePair *np = &stack[--stack_size];
+        ctNode *n = np->node, *p = np->prev;
+       
+        for (a=n->up; a!=NULL; a=a->nextUp) {
+            if (a->hi != p) {
+                NodePair *top = pushNodePair(&stack,&stack_size,&stack_cap);
+                top->node = a->hi;
+                top->prev = n;
+
+                {   ctNode *newLo = ctNodeMap_find(nodeMap,n->i),
+                           *newHi = ctNodeMap_find(nodeMap,a->hi->i);
+                    ctArc *newArc = ctArc_new(newHi,newLo,ctx);
+                    ctNode_addUpArc(newLo,newArc);
+                    ctNode_addDownArc(newHi,newArc);
+                    anArc = newArc;
+                    if (moveData) {
+                        newArc->data=a->data; 
+                        a->data=newArc;
+                    }
+                }
+            }
+        }
+        for (a=n->down; a!=NULL; a=a->nextDown) {
+            if (a->lo != p) {
+                NodePair *top = pushNodePair(&stack,&stack_size,&stack_cap);
+                top->node = a->lo;
+                top->prev = n;
+
+                {   ctNode *newHi = ctNodeMap_find(nodeMap,n->i),
+                           *newLo = ctNodeMap_find(nodeMap,a->lo->i);
+                    ctArc *newArc = ctArc_new(newHi,newLo,ctx);
+                    ctNode_addUpArc(newLo,newArc);
+                    ctNode_addDownArc(newHi,newArc);
+                    anArc = newArc;
+                    if (moveData) {
+                        newArc->data=a->data; 
+                        a->data=newArc;
+                    }
+                }
+            }
+        }
+    }
+   
+    ctNodeMap_delete(nodeMap);
+    return anArc;
+}
+
+
+void
+ct_arcsAndNodes
+(   ctArc *src, 
+    ctArc ***arcsOut, 
+    size_t *numArcsOut,
+    ctNode ***nodesOut,
+    size_t *numNodesOut )
+{
+    ctNode *start = src->lo;
+    ctArc *a; /* arc iterator in for loops */
+
+    size_t arcs_size=0, nodes_size=0, arcs_cap=256, nodes_cap=256;
+    ctArc **arcs = (ctArc**)malloc(arcs_cap*sizeof(ctArc*));
+    ctNode **nodes = (ctNode**)malloc(nodes_cap*sizeof(ctNode*));
+
+    size_t stack_cap = 256, stack_size;
+    NodePair *stack = (NodePair*)malloc(sizeof(NodePair)*stack_cap);
+
+    stack_size=1; 
+    stack[0].node = start;
+    stack[0].prev = 0;
+
+    while (stack_size>0) {
+        NodePair *np = &stack[--stack_size];
+        ctNode *n = np->node, *p = np->prev;
+       
+        nodes[nodes_size++] = n;
+        if (nodes_size == nodes_cap)
+            nodes = (ctNode**)realloc(nodes,sizeof(ctNode*)*(nodes_cap*=2));
+
+        for (a=n->up; a!=NULL; a=a->nextUp) {
+            if (a->hi != p) {
+                NodePair *top = pushNodePair(&stack,&stack_size,&stack_cap);
+                top->node = a->hi;
+                top->prev = n;
+
+                arcs[arcs_size++] = a;
+                if (arcs_size == arcs_cap)
+                    arcs = (ctArc**)realloc(arcs,sizeof(ctArc*)*(arcs_cap*=2));
+            }
+        }
+        for (a=n->down; a!=NULL; a=a->nextDown) {
+            if (a->lo != p) {
+                NodePair *top = pushNodePair(&stack,&stack_size,&stack_cap);
+                top->node = a->lo;
+                top->prev = n;
+
+                arcs[arcs_size++] = a;
+                if (arcs_size == arcs_cap)
+                    arcs = (ctArc**)realloc(arcs,sizeof(ctArc*)*(arcs_cap*=2));
+            }
+        }
+    }
+    *arcsOut = (ctArc**)realloc(arcs,sizeof(ctArc*)*arcs_size);
+    *numArcsOut = arcs_size;
+    *nodesOut = (ctNode**)realloc(nodes,sizeof(ctNode*)*nodes_size);
+    *numNodesOut = nodes_size;
+}
+
+void
+ct_deleteTree( ctArc *a, ctContext *ctx )
+{
+    size_t narcs,nnodes,i;
+    ctArc **arcs;
+    ctNode **nodes;
+    ct_arcsAndNodes(a,&arcs,&narcs,&nodes,&nnodes);
+    for (i=0; i<narcs; ++i) ctArc_delete(arcs[i],ctx);
+    for (i=0; i<nnodes; ++i) ctNode_delete(nodes[i],ctx);
+    free(arcs);
+    free(nodes);
+}
 
 /**/

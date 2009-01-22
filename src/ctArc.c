@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ctArc * ctArc_new(ctNode * h, ctNode * l, ctContext * ctx)
 {
-	ctArc * a = (*(ctx->arcAlloc))(ctx->data);
+	ctArc * a = (*(ctx->arcAlloc))(ctx->cbData);
 	a->hi = h;
 	a->lo = l;
 	a->nextUp = a->nextDown = a->prevUp = a->prevDown = NULL;
@@ -43,7 +43,7 @@ ctArc * ctArc_new(ctNode * h, ctNode * l, ctContext * ctx)
 
 void ctArc_delete( ctArc * a, ctContext * ctx )
 {
-	(*(ctx->arcFree))(a,ctx->data);
+	(*(ctx->arcFree))(a,ctx->cbData);
 }
 	
 ctArc * ctArc_find( ctArc * self )

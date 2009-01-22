@@ -1,9 +1,9 @@
 CC = gcc
 CPPFLAGS = -I./include
-CFLAGS = -ansi -pedantic -Wall -Werror -fPIC -O2
+CFLAGS = -ansi -pedantic -Wall -Werror -fPIC -g
 
 AR = ar
-ARFLAGS = -q
+ARFLAGS = -r
 
 all : shared static
 
