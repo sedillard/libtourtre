@@ -75,8 +75,6 @@ ct_init
     /* zero-out the struct */
     memset(ctx, 0, sizeof(ctContext) );
     
-    
-    
     /* set default values */
     ctx->maxValence = 256;
     ctx->arcAlloc = ct_arcMalloc;
@@ -951,6 +949,13 @@ ct_deleteTree( ctArc *a, ctContext *ctx )
     for (i=0; i<nnodes; ++i) ctNode_delete(nodes[i],ctx);
     free(arcs);
     free(nodes);
+}
+
+
+void 
+ct_priorityFunc( ctContext *ctx, double (*priorityFunc)(ctNode*,void*) )
+{
+    ctx->priority = priorityFunc;
 }
 
 /**/
