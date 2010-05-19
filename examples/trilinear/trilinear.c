@@ -213,8 +213,8 @@ tl_create_trilinear_graph
     Values data,  /* the 3D voxel grid */
 
     /*output*/ 
-    uint32_t *num_inds,
-    uint32_t *sorted_inds[] 
+    size_t *num_inds,
+    size_t *sorted_inds[] 
         /* a list of contiguous indexes of graph vertices, in the range 0..n-1,
          * sorted by total_order */
 )
@@ -411,6 +411,7 @@ find_face_saddle
             assert( *saddle_val != val[1] );
             assert( *saddle_val != val[2] );
             assert( *saddle_val != val[3] );
+            *orientation = NO_ORIENTATION;
             *sort = SORT_NATURALLY;
             *whom = (size_t)-1;
             *loc0 = x;

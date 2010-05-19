@@ -293,7 +293,7 @@ main (int argc__, char *argv__[])
     }
 
     size_t size = sizei[0]*sizei[1]*sizei[2];
-    size_t sizeu[3] = {sizei[0],sizei[1],sizei[2]};
+    uint32_t sizeu[3] = {sizei[0],sizei[1],sizei[2]};
    
     struct stat s;
     stat(argv[4],&s);
