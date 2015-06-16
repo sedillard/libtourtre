@@ -1,5 +1,3 @@
 libtourtre
 
-Look in ./doc/html/index.html for documentation.
- 
-If it doesn't exist, run doxygen
+See http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/doc/html/
