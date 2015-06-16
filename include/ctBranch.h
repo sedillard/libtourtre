@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 \file ctBranch.h
 
 \brief Defines ctBranch, ctBranchList and related functions.
-	
+
 This file defines the ctBranch structure, which forms the branch decomposition. It also defines ctBranchList.
 */
 
@@ -52,9 +52,9 @@ struct ctContext;
 */
 typedef struct ctBranchList
 {
-    /** 
+    /**
      * Start of list. To iterate, follow ctBranch nextChild and prevChild
-     * pointers. 
+     * pointers.
      **/
     struct ctBranch *head;
 
@@ -75,13 +75,13 @@ typedef struct ctBranch
 
 	/** Saddle vertex. */
 	size_t saddle;
-	
+
 	/** Parent branch, where saddle is attached. */
 	struct ctBranch *parent;
 
 	/** List of child branches. */
 	ctBranchList children;
-	
+
 	/** Part of ctBranchList */
 	struct ctBranch *nextChild;
 
@@ -90,7 +90,7 @@ typedef struct ctBranch
 
 	/** User data */
 	void * data;
-	
+
 } ctBranch;
 
 
@@ -98,10 +98,10 @@ typedef struct ctBranch
 /** Create an empty branch list */
 ctBranchList  ctBranchList_init   ();
 
-/** 
+/**
  * Add branch br to a branch list. br will be inserted in order of ascending
  * function value of the saddle. The order does \em not respect the total order
- * provided \ref ct_init  
+ * provided \ref ct_init
  **/
 void  ctBranchList_add    ( ctBranchList * self, ctBranch * br, struct ctContext * ctx );
 
@@ -111,9 +111,9 @@ void  ctBranchList_remove ( ctBranchList * self, ctBranch * br );
 /** Merge two sorted branch lists. */
 void  ctBranchList_merge  ( ctBranchList * self, ctBranchList * other, struct ctContext * ctx );
 
-/** 
+/**
  * Allocate a new branch using the allocator specified by \ref
- * ct_branchAllocator 
+ * ct_branchAllocator
  **/
 ctBranch*  ctBranch_new    ( size_t extremum, size_t saddle, struct ctContext* ctx );
 

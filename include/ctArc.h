@@ -41,7 +41,7 @@ This file defines the ctArc structure, which works together with ctNode to form 
 #include "ctBranch.h"
 
 struct ctNode; /* fwd decl */
-struct ctContext; 
+struct ctContext;
 
 /**
 
@@ -60,48 +60,48 @@ typedef struct ctArc
 {
 	/** Node at the top of the arc */
 	struct ctNode *hi;
-	
+
 	/** Node at the bottom of the arc */
 	struct ctNode *lo;
-	
+
 	/** Next arc in the list of arcs attached to the lo node */
 	struct ctArc *nextUp;
-	
+
 	/** Previous arc in the list of arcs attached to the lo node */
 	struct ctArc *prevUp;
-	
+
 	/** Next arc in the list of arcs attached to the hi node */
 	struct ctArc *nextDown;
-	
+
 	/** Previous arc in the list of arcs attached to the hi node */
 	struct ctArc *prevDown;
-	
+
 	/** User data */
 	void * data; /* user data */
-	
-        /** 
+
+        /**
          * Branch that this arc becomes after decomposition. Only valid after
          * ct_decompose is called. */
-	ctBranch * branch; 
-	
-        /** 
+	ctBranch * branch;
+
+        /**
          * Temporary storage for branches that will be children of this
          * arc/branch. Don't use. Access through ctBranch instead.  */
 	ctBranchList children;
-	
+
 	/** Union-find pointer. Don't touch. */
 	struct ctArc * uf;
-	
-
-} ctArc;	
 
 
-/** 
+} ctArc;
+
+
+/**
  * Allocate a new ctArc, that spans nodes h and l. The node is allocated
  * using the allocator specified by \ref ct_arcAllocator */
 ctArc*  ctArc_new    ( struct ctNode * h, struct ctNode * l, struct ctContext * ctx );
 
-/** 
+/**
  * Delete a ctArc structure using the deallocator specified by \ref
  * ct_arcAllocator*/
 void  ctArc_delete ( ctArc * self, struct ctContext * ctx );

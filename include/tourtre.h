@@ -42,22 +42,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /** \brief Holds all the data.
 */
-typedef struct ctContext ctContext; 
+typedef struct ctContext ctContext;
 
 
 
-/** 
+/**
 Call this first. This function provides the needed data and callbacks to the
 library, so that it can compute the contour tree of your...whatever it is. This
 also allocates the working memory for the library. The corresponding
-deallocation function is ct_cleanup 
+deallocation function is ct_cleanup
 
 @param numVertices     Number of vertices in the mesh
 
 @param totalOrder      Array of vertex indexes, in sorted order.
 
 @param value           Callback to get function value of a vertex v. Used only
-                       for estimating persistence of arcs. 
+                       for estimating persistence of arcs.
 
 @param neighbors       Callback to get the neighboring vertices of vertex v.
                        This function should store the indexes of the neighbors
@@ -68,9 +68,9 @@ deallocation function is ct_cleanup
 @param data            User data passed to all callbacks.
 */
 
-ctContext * ct_init( 
+ctContext * ct_init(
     size_t  numVertices,
-    size_t  *totalOrder, 
+    size_t  *totalOrder,
     double  (*value)( size_t v, void* ),
     size_t  (*neighbors)( size_t v, size_t* nbrs, void* ),
     void*  data
@@ -85,14 +85,14 @@ ctContext * ct_init(
 
 
 
-/** 
+/**
  * Informs the library what the maximum valence of a vertex will be. Default
  * is 256. Feel free to make this large, as an array of this size is only
- * allocated once. 
+ * allocated once.
  **/
-void ct_maxValence( ctContext * ctx, size_t max ); 
+void ct_maxValence( ctContext * ctx, size_t max );
 
-/** 
+/**
  * Process a vertex in the sweepAndMerge algorithm. This is called when the
  * arc belonging to v is added to the contour tree. One use for this might be
  * to estimate the area/volume of an arc.  If your vertices are evenly spaced,
@@ -100,56 +100,56 @@ void ct_maxValence( ctContext * ctx, size_t max );
  * function.  This function may not be called for every arc, but when it is
  * called, you can use the vertex v as a <a
  * href="http://citeseer.ist.psu.edu/bajaj98contour.html">path seed</a> for
- * arc a.  It will be called many times for the "big, important arcs." 
- **/  
+ * arc a.  It will be called many times for the "big, important arcs."
+ **/
 void ct_vertexFunc( ctContext * ctx, void (*vertexFunc)( size_t v, ctArc* a, void* ) );
 
 
-/** 
+/**
  * This is called when two arcs are merged by simplification. If you are
  * keeping track of arc properties using ct_vertexFunc, then you will want to
  * sum up those properties using this function. The first argument is the arc
  * which will remain after the merge, the second argument is the one which
- * will be deleted. 
+ * will be deleted.
  **/
 void ct_arcMergeFunc( ctContext * ctx, void (*arcMergeFunc)( ctArc* a, ctArc* b, void* ) );
 
 
 
-/** 
+/**
  * Define the simplification priority of an arc. The function is passed a leaf
  * node. Use ctNode_leafArc() to access the leaf arc. Arcs with smaller
  * priority are pruned first. For example, you might use the arc area/volume
- * directly as a simplification priority. 
+ * directly as a simplification priority.
  **/
 void ct_priorityFunc( ctContext * ctx, double (*priorityFunc)( ctNode*, void* ) );
 
 
-	
-/** 
+
+/**
  * Provide your own alloc/free functions for ctArc structures. You will need
- * to use these if you want to subclass ctArc. 
- **/ 	
+ * to use these if you want to subclass ctArc.
+ **/
 void ct_arcAllocator( ctContext * ctx, ctArc* (*allocArc)(void*), void (*freeArc)( ctArc*, void*) );
 
-/** 
+/**
  * Provide your own alloc/free functions for ctNode structures. You will need
- * to use this if you want to sublcass ctNode. 
+ * to use this if you want to sublcass ctNode.
  **/
-void ct_nodeAllocator( ctContext * ctx, ctNode* (*allocNode)(void*) , void (*freeNode)( ctNode*, void*) );		
+void ct_nodeAllocator( ctContext * ctx, ctNode* (*allocNode)(void*) , void (*freeNode)( ctNode*, void*) );
 
-/** 
+/**
  * Provide your own alloc/free functions for ctBranch structures. You will need
- * to use this if you want to sublcass ctBranch. 
+ * to use this if you want to sublcass ctBranch.
  **/
 void ct_branchAllocator( ctContext * ctx, ctBranch* (*allocBranch)(void*), void (*freeBranch)( ctBranch*, void*) );
 
 
 
-        
-/** 
+
+/**
  * Perform the sweep and merge algorithm. This will take a while. Returns some
- * arc of the contour tree. The constructed tree is owned by the library, and 
+ * arc of the contour tree. The constructed tree is owned by the library, and
  * will be deleted when ct_cleanup is called. If you want your own tree, use
  * ct_copyTree.
  **/
@@ -181,23 +181,23 @@ void ct_splitSweep( ctContext * ctx );
 
 ctArc * ct_mergeTrees( ctContext * ctx );
 
-/** 
+/**
  * Perform the branch decomposition.  Returns the root branch.  This consumes
  * the contour tree, so don't access the contour tree or use ct_arcMap after
  * calling ct_decompose. If you need to keep the contour tree around, use
  * ct_copyTree to make a copy of it. The branch-decomposition tree that is
  * returned is YOURS. The library does not free it when ct_cleanup is called.
- **/   
+ **/
 ctBranch*  ct_decompose ( ctContext * ctx );
 
 
 
-/** Free the working memory. */   
+/** Free the working memory. */
 void  ct_cleanup ( ctContext * ctx );
 
 
 
-/** 
+/**
  * Retreive the vertex-to-arc mapping. Returns an array of size equal to
  * ctContext.numVerts, where element i points to the arc which contains vertex
  * i. If i is a critical point, the map will point to one of the attached
@@ -209,7 +209,7 @@ void  ct_cleanup ( ctContext * ctx );
 ctArc ** ct_arcMap( ctContext * ctx );
 
 
-/** 
+/**
  * Retreive the vertex-to-branch mapping. Returns an array of size equal to
  * ctContext.numVerts, where element i points to the branch which contains
  * vertex i. If i is a saddle point, the map will point to the parent branch.
@@ -217,7 +217,7 @@ ctArc ** ct_arcMap( ctContext * ctx );
  * or free the result of ct_arcMap before calling ct_branchMap.  Ownership of
  * the array is passed to the calling environment. It is your responsibility
  * to free() this. This allows to you call ct_cleanup and still use your
- * branch map. 
+ * branch map.
  **/
 ctBranch ** ct_branchMap( ctContext * ctx );
 
@@ -237,12 +237,12 @@ ctBranch ** ct_branchMap( ctContext * ctx );
  * the data fields. The issue is that I don't yet have an efficient way to
  * make a copy the arcMap, so that it can be used to look up arcs in the new
  * tree.  Using this (lame, hackish) method, you can do the following:
- * 
- * \code 
+ *
+ * \code
  * ctArc *newTree = ct_copyTree(oldTree,TRUE,ctx);
  * ctArc **newArcMap = malloc( numVerts * sizeof(ctArc*) );
  * ctArc **oldArcMap = ct_arcMap(ctx);
- * for (size_t i=0; i<numVerts; ++i) 
+ * for (size_t i=0; i<numVerts; +i)
  *   newArcMap[i] = oldArcMap[i]->data;
  * \endcode
  *
@@ -251,20 +251,20 @@ ctBranch ** ct_branchMap( ctContext * ctx );
  **/
 ctArc* ct_copyTree( ctArc *src, int moveData, ctContext *ctx );
 
-	
+
 /**
  * Fetch all the arcs and nodes in a tree. They are returned in arrays
- * arcsOut and nodesOut, which you must free. These are arrays of 
+ * arcsOut and nodesOut, which you must free. These are arrays of
  * ctArc and ctNode pointers, which are returned by reference, hence the ***
  * silliness.
  **/
 
-void ct_arcsAndNodes( ctArc *a, 
-                      ctArc ***arcsOut,  size_t *numArcsOut, 
+void ct_arcsAndNodes( ctArc *a,
+                      ctArc ***arcsOut,  size_t *numArcsOut,
                       ctNode ***nodesOut, size_t *numNodesOut );
 
 
-/** 
+/**
  * Delete a contour tree that you obtained from ct_copyTree. DON'T delete
  * the original tree obtained from ct_sweepAndMerge or ct_mergeTrees; That
  * one belongs to the library and will be freed by ct_cleaup
@@ -274,25 +274,25 @@ void ct_deleteTree( ctArc *a, ctContext *ctx );
 
 
 
-/**  
+/**
     \mainpage libtourtre: A Contour Tree Library
     \image html tourtre.jpg
     \htmlonly
     <center>
     libtourtre is a library for con<u>tourtre</u>es. Tourtre is the French name
-    for a bird. Here is a picture of said bird on a tree. 
+    for a bird. Here is a picture of said bird on a tree.
     </center>
     \endhtmlonly
 
     \section Introduction
-    
+
     This library implements the contour tree construction algorithm outlined in
-    the paper "Computing Contour Trees in All Dimensions" 
-    \htmlonly <a href="http://citeseer.ist.psu.edu/carr99computing.html">[link]</a> \endhtmlonly 
+    the paper "Computing Contour Trees in All Dimensions"
+    \htmlonly <a href="http://citeseer.ist.psu.edu/carr99computing.html">[link]</a> \endhtmlonly
     by Carr, Snoeyink and Axen, and variant of another algorithm
     described in "Multi-Resolution computation and presentation of Contour
-    Trees" 
-    \htmlonly <a href="http://pascucci.org/pdf-papers/orrery-2005.pdf">[link]</a> \endhtmlonly 
+    Trees"
+    \htmlonly <a href="http://pascucci.org/pdf-papers/orrery-2005.pdf">[link]</a> \endhtmlonly
     by Pascucci, Cole-McLaughlin and Scorzelli, which computes the so-called
     "branch decomposition." The algorithms are separate, but the latter depends
     on the former. The library contains three data structures (Arc, Node and
@@ -300,10 +300,10 @@ void ct_deleteTree( ctArc *a, ctContext *ctx );
     decomposition.
 
     \section Features
-    
+
     A contour tree can be extracted from any scalar function defined on a
-    domain which satisfies certain properties.  These properties are described in 
-    \htmlonly <a href="http://www.cs.ucd.ie/staff/hcarr/home/">Hamish Carr's</a>\endhtmlonly 
+    domain which satisfies certain properties.  These properties are described in
+    \htmlonly <a href="http://www.cs.ucd.ie/staff/hcarr/home/">Hamish Carr's</a>\endhtmlonly
     dissertation (if not elsewhere), but it suffices to say that it it works on
     simplicial complexes of genus zero. If your simplicial complex has holes,
     then you're looking for a Reeb graph, which is another algorithm. With some
@@ -320,7 +320,7 @@ void ct_deleteTree( ctArc *a, ctContext *ctx );
     or something.
 
     \section Usage
-    
+
     Include tourtre.h in your program.  Call ct_init() to create a ctContext,
     then call ct_sweepAndMerge() to create the contour tree and (optionally)
     ct_decompose() to transform it into a branch decomposition.
@@ -330,14 +330,8 @@ void ct_deleteTree( ctArc *a, ctContext *ctx );
     composed of \link ctBranch branches \endlink which form a rooted tree.
 
     \section Download
-    
-    The latest version is v15. There is a bug fix in the trilinear example
-    program. Thanks to Vijeth Dinesha for spotting it.<br> 
-    \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v15.tar.gz">Download libtourtre_v15.tar.gz</a>\endhtmlonly 
 
-    There is an API change from v8 (which is still available: 
-    \htmlonly <a href="http://graphics.cs.ucdavis.edu/~sdillard/libtourtre/libtourtre_v8.tar.gz">libtourtre_v8.tar.gz</a>. \endhtmlonly 
-    ) A comparison callback is no longer required, the total order suffices. 
+    The code is hosted at Github: <a href="http://github.com/sedillard/libtourtre">http://github.com/sedillard/libtourtre</a>
 */
 
 #endif

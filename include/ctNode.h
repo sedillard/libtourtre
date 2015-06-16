@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 \file ctNode.h
 
 \brief Defines ctNode and related functions.
-	
+
 This file defines the ctNode structure and functions to manipulate the contour tree.
 */
 
@@ -46,12 +46,12 @@ struct ctContext;
 /**
 
 \brief Nodes of the contour tree
-    
+
     This is a critical point in the contour tree. Together with ctArc, this forms the contour tree data structure.
     Nodes serve as connection points for arcs. You can store information in their data field, but you probably want
     to pay more attention to the arcs */
 
-typedef struct ctNode 
+typedef struct ctNode
 {
 	/** Critical vertex that this node represents. */
 	size_t i;
@@ -60,7 +60,7 @@ typedef struct ctNode
 
 		for (ctArc * a = node->up; a != NULL; a = a->nextUp )...
 	*/
-	struct ctArc *up; 
+	struct ctArc *up;
 
 	/** Doubly-linked, null-terminated list of arcs extended upwards from this node. Iterate like this:
 
@@ -86,7 +86,7 @@ ctNode*  ctNode_new           ( size_t i, struct ctContext* ctx );
 
 /** Is this node a max? (checks for a null down pointer.) */
     int  ctNode_isMin         ( ctNode* self );
-    
+
 /** isMax or isMin  */
     int  ctNode_isLeaf        ( ctNode* self );
 
@@ -102,10 +102,10 @@ ctNode*  ctNode_otherNode     ( ctNode* self );
 /** Add an arc to the list of upward arcs */
    void  ctNode_addUpArc      ( ctNode* self, ctArc * a );
 
-/** Add an arc to the list of downward arcs */   
+/** Add an arc to the list of downward arcs */
    void  ctNode_addDownArc    ( ctNode* self, ctArc * a );
 
-/** Remove an arc from the list of upward arcs */   
+/** Remove an arc from the list of upward arcs */
    void  ctNode_removeUpArc   ( ctNode* self, ctArc * a );
 
 /** Remove an arc from the list of downward arcs */
