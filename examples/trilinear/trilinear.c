@@ -1174,18 +1174,6 @@ tl_value( TrilinearGraph* g, size_t i )
 }
 
 
-
-
-static inline 
-void 
-swap( size_t *a, size_t *b ) 
-{
-  int t = *a;
-  *a = *b;
-  *b = t;
-}
-
-
 static
 void  
 sort_grid_verts
